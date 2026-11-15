@@ -57,18 +57,28 @@ with tab2:
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
+                        # Convert uploaded file bytes for correct SDK handling
+                        image_bytes = uploaded_file.getvalue()
+                        mime_type = uploaded_file.type
+                        
                         prompt = """
-                        Analyze this image of a 2D lottery slip or customer message containing numbers like '48r2500' (meaning number 48, amount 2500) or similar. Extract all betting entries.
+                        Analyze this image of a 2D lottery slip or customer message containing numbers like '34r2000' (meaning number 34, amount 2000) or similar. Extract all betting entries.
                         Return the result strictly as a JSON list of objects, where each object has:
                         - "Customer": string (Name of customer if available, otherwise "Unknown")
-                        - "Number": string (2D 2-digit number, e.g., "48", "43", "05")
-                        - "Amount": integer (Bet amount in MMK, e.g., 2500, 500)
+                        - "Number": string (2D 2-digit number, e.g., "34", "38", "05")
+                        - "Amount": integer (Bet amount in MMK, e.g., 2000, 3000)
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
                         response = client.models.generate_content(
                             model='gemini-2.5-flash',
-                            contents=[uploaded_file, prompt]
+                            contents=[
+                                prompt,
+                                {
+                                    'mime_type': mime_type,
+                                    'data': image_bytes
+                                }
+                            ]
                         )
                         
                         clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
