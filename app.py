@@ -60,11 +60,11 @@ with tab2:
                         client = genai.Client(api_key=gemini_api_key)
                         
                         prompt = """
-                        Analyze this image of a 2D lottery slip or customer message containing numbers like '34r2000' or similar entries. Extract all betting entries.
+                        Analyze this image of a 2D lottery slip or customer message containing numbers like '65r1000' (number 65, amount 1000), 'အပူ10ကွက်1000' or similar entries. Extract all individual betting entries.
                         Return the result strictly as a JSON list of objects, where each object has:
                         - "Customer": string (Name of customer if available, otherwise "Unknown")
-                        - "Number": string (2D 2-digit number, e.g., "34", "38", "05")
-                        - "Amount": integer (Bet amount in MMK, e.g., 2000, 3000)
+                        - "Number": string (2D 2-digit number, e.g., "65", "63", "05")
+                        - "Amount": integer (Bet amount in MMK, e.g., 1000, 750)
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
