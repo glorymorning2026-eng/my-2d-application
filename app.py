@@ -30,7 +30,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 
 # Gemini API Key Input in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 AI Interactions API ဆက်တင်")
+st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
@@ -53,7 +53,7 @@ def expand_shorthand(customer, text_input, amount):
                 entries.append({"Customer": customer, "Number": n2, "Amount": amount})
             return entries
 
-    if 'ပါတ်' in text or 'ပတ်' in text:
+    if 'ပါတ်' in text or 'ပတ်' in text or text.endswith('ပါ') or text.endswith('ပ'):
         p_num = ''.join(filter(str.isdigit, text))
         if len(p_num) == 1:
             for i in range(10):
@@ -130,12 +130,12 @@ with tab1:
 
 with tab2:
     st.markdown("#### 💬 ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ဤနေရာတွင် ကူးထည့်ပါ")
-    st.markdown("*(ဥပမာ: 3ပါတ် 500, 34=300, 39=900, 65r1000 စသည်ဖြင့် ရောနှောပါဝင်နိုင်သည်)*")
+    st.markdown("*(ဥပမာ: 2ပါ 500, 2ဘရိတ် 300, 2B 400, 34=300, 65r1000 စသည်ဖြင့် ရောနှောပါဝင်နိုင်သည်)*")
     
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
     
-    if st.button("🤖 စာသားကို AI (Interactions API) ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
+    if st.button("🤖 စာသားကို AI ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not gemini_api_key:
@@ -143,19 +143,20 @@ with tab2:
         elif not sms_customer or not sms_text_input:
             st.error("ဖောက်သည် အမည်နှင့် စာသားကို ဖြည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("AI က Interactions API ကိုသုံး၍ ရောနှောနေသော စာသားများကို တွက်ချက်နေပါပြီ..."):
+            with st.spinner("AI က အတိုကောက်များ (2ပါ, 2B, 2ဘရိတ် စသည်) ကို တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
-                    Analyze the following customer betting message text which may contain mixed entries, multiple items separated by commas, spaces, or lines (e.g., "3ပါတ် 500, 34=300, 39=900, 65r1000", etc.).
+                    Analyze the following customer betting message text which may contain mixed entries, abbreviations, and amounts (e.g., "2ပါ 500", "2ဘရိတ် 300", "2B 400", "2bk 500", "34=300", "65r1000", etc.).
                     Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these rules:
-                    1. Reversed ('r' or 'ရ'): E.g., '39 r 1000' or '65r1000' means both numbers and their reverses with the specified amount each.
-                    2. Paat-Thie (ပါတ်သီး): E.g., '3 ပါတ် 500' means all 19 numbers containing '3' with 500 MMK each.
-                    3. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers with 500 MMK each.
-                    4. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96 with specified amount each.
-                    5. Direct numbers with mixed amounts: E.g., '34=300' or '39-900' or '12ခွက် 1000'. Ensure each extracted bet amount is between 100 and 50000 MMK.
+                    1. Reversed ('r' or 'ရ'): E.g., '39 r 1000' or '65r1000' means both numbers and their reverses.
+                    2. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' or '2ပါတ် 500' means all 19 numbers containing '2' with 500 MMK each.
+                    3. Break (ဘရိတ် variations like 'ဘရိတ်', 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300', '2B 300', or '2bk 300' means all 10 numbers whose sum's last digit is 2 (02, 11, 20, 39, 93, 48, 84, 57, 75, 66) with 300 MMK each.
+                    4. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers with 500 MMK each.
+                    5. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96 with specified amount each.
+                    6. Direct numbers with mixed amounts: E.g., '34=300'. Ensure each extracted bet amount is between 100 and 50000 MMK.
 
                     Customer Name is: "{sms_customer}"
                     Message text to analyze:
@@ -168,7 +169,6 @@ with tab2:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    # Using Interactions API (client.interactions.create) with latest recommended model
                     interaction = client.interactions.create(
                         model='gemini-4-hydrogen',
                         input=prompt
@@ -217,19 +217,14 @@ with tab3:
             elif not gemini_api_key:
                 st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
             else:
-                with st.spinner("AI က ပုံထဲပါသော ရောနှောစာရင်းများကို တွက်ချက်ဖတ်ရှုနေပါပြီ..."):
+                with st.spinner("AI က ပုံထဲပါသော အတိုကောက်စာရင်းများကို တွက်ချက်နေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
                         prompt = """
                         You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99). 
-                        Analyze the provided image of customer betting messages/slips containing mixed Myanmar 2D shorthand terms and amounts. 
-                        Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK (must be between 100 and 50000) based on these rules:
-                        1. Reversed ('r' or 'ရ'): E.g., '39 r 1000' means both numbers with 1000 MMK each.
-                        2. Paat-Thie (ပါတ်သီး): E.g., '3 ပါတ် 500' means all 19 numbers with 500 MMK each.
-                        3. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers with 500 MMK each.
-                        4. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96 with specified amount each.
-                        5. Direct mixed numbers with amounts.
+                        Analyze the provided image of customer betting messages/slips containing abbreviations like '2ပါ', '2B', '2ဘရိတ်', etc. 
+                        Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK (between 100 and 50000).
 
                         Return the result strictly as a JSON list of objects, where each object has:
                         - "Customer": string (Name of customer if visible, otherwise "Unknown")
@@ -238,8 +233,6 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        # Note: For image processing, client.interactions.create supports contents/files depending on SDK version, 
-                        # falling back or matching the standard interactions pattern.
                         interaction = client.interactions.create(
                             model='gemini-4-hydrogen',
                             input=[img, prompt]
@@ -326,4 +319,4 @@ if not st.session_state.data.empty:
         st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
         st.rerun()
 else:
-    st.info("ယခုထိုက် ထည့်ထားသော စာရင်း မရှိသေးပါ။")
+    st.info("ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။")
