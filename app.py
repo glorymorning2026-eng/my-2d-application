@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+from PIL import Image
 from google import genai
 
 st.set_page_config(page_title="Myanmar 2D Dealer App", layout="wide")
@@ -47,7 +48,8 @@ with tab2:
     uploaded_file = st.file_uploader("ဖောက်သည် ပို့ထားသော စကရင်ရှော့ ပုံတင်ရန်", type=["png", "jpg", "jpeg"])
     
     if uploaded_file is not None:
-        st.image(uploaded_file, caption="တင်ထားသော စကရင်ရှော့ပုံ", width=300)
+        img = Image.open(uploaded_file)
+        st.image(img, caption="တင်ထားသော စကရင်ရှော့ပုံ", width=300)
         
         if st.button("🤖 ဓာတ်ပုံထဲမှ စာရင်းများကို AI ဖြင့် ဖတ်မည်"):
             if not gemini_api_key:
@@ -57,12 +59,8 @@ with tab2:
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
-                        # Convert uploaded file bytes for correct SDK handling
-                        image_bytes = uploaded_file.getvalue()
-                        mime_type = uploaded_file.type
-                        
                         prompt = """
-                        Analyze this image of a 2D lottery slip or customer message containing numbers like '34r2000' (meaning number 34, amount 2000) or similar. Extract all betting entries.
+                        Analyze this image of a 2D lottery slip or customer message containing numbers like '34r2000' or similar entries. Extract all betting entries.
                         Return the result strictly as a JSON list of objects, where each object has:
                         - "Customer": string (Name of customer if available, otherwise "Unknown")
                         - "Number": string (2D 2-digit number, e.g., "34", "38", "05")
@@ -72,13 +70,7 @@ with tab2:
                         
                         response = client.models.generate_content(
                             model='gemini-2.5-flash',
-                            contents=[
-                                prompt,
-                                {
-                                    'mime_type': mime_type,
-                                    'data': image_bytes
-                                }
-                            ]
+                            contents=[img, prompt]
                         )
                         
                         clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
