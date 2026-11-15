@@ -176,7 +176,6 @@ with tab2:
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
-                    # Validate amount limits and blocked numbers
                     valid_rows = []
                     blocked_found = []
                     invalid_amt_found = 0
