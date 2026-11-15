@@ -18,7 +18,6 @@ winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 AI ဓာတ်ပုံဖတ်စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
-st.sidebar.markdown("[Google AI Studio](https://aistudio.google.com/) မှ API Key အခမဲ့ ရယူနိုင်ပါသည်။")
 
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
@@ -57,26 +56,22 @@ with tab2:
                 with st.spinner("AI က ဓာတ်ပုံထဲပါသော နံပါတ်နှင့် ငွေပမာဏများကို ဖတ်ရှုနေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
-                        image_bytes = uploaded_file.getvalue()
                         
                         prompt = """
-                        Analyze this image of a 2D lottery slip or customer message. Extract all betting entries.
+                        Analyze this image of a 2D lottery slip or customer message containing numbers like '48r2500' (meaning number 48, amount 2500) or similar. Extract all betting entries.
                         Return the result strictly as a JSON list of objects, where each object has:
                         - "Customer": string (Name of customer if available, otherwise "Unknown")
-                        - "Number": string (2D 2-digit number, e.g., "35", "05")
-                        - "Amount": integer (Bet amount in MMK)
+                        - "Number": string (2D 2-digit number, e.g., "48", "43", "05")
+                        - "Amount": integer (Bet amount in MMK, e.g., 2500, 500)
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
                         response = client.models.generate_content(
                             model='gemini-2.5-flash',
-                            contents=[
-                                {"mime_type": uploaded_file.type, "data": image_bytes},
-                                prompt
-                            ]
+                            contents=[uploaded_file, prompt]
                         )
                         
-                        clean_text = response.text.strip().replace("```json", "").replace("```", "")
+                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         new_df = pd.DataFrame(extracted_data)
