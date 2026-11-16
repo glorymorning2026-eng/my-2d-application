@@ -65,31 +65,47 @@ Ensure each extracted bet amount is strictly between 100 and 50000 MMK.
 Return the result strictly as a raw JSON list of objects with keys: "Customer", "Number" (2-digit string "00"-"99"), and "Amount" (integer). No markdown formatting.
 """
 
-def generate_with_retry(client, contents):
-    """Call Gemini and retry temporary 503/high-demand responses."""
-    delays = (0, 3, 7, 12)
-    last_error = None
-    for delay in delays:
-        if delay:
-            time.sleep(delay)
-        try:
-            return client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=contents,
-            )
-        except Exception as exc:
-            message = str(exc).upper()
-            is_temporary = (
-                "503" in message
-                or "UNAVAILABLE" in message
-                or "HIGH DEMAND" in message
-            )
-            if not is_temporary:
-                raise
-            last_error = exc
+MODEL_CANDIDATES = [
+    # Confirm these names are enabled for the Gemini API key in use.
+    "gemini-3.8-flash",
+    "gemini-3.8-flash-lite",
+]
+
+
+def generate_with_fallback(client, contents):
+    """Try the primary model, then a fallback model for temporary failures."""
+    retry_delays = (0, 3, 7, 12)
+    errors = []
+
+    for model_name in MODEL_CANDIDATES:
+        for delay in retry_delays:
+            if delay:
+                time.sleep(delay)
+            try:
+                return client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                )
+            except Exception as exc:
+                message = str(exc).upper()
+                errors.append(f"{model_name}: {exc}")
+                is_temporary = (
+                    "503" in message
+                    or "UNAVAILABLE" in message
+                    or "HIGH DEMAND" in message
+                )
+                is_unavailable = "404" in message or "NOT_FOUND" in message
+                if is_unavailable:
+                    # This model is not enabled/available; move to the fallback.
+                    break
+                if not is_temporary:
+                    raise
+
     raise RuntimeError(
-        "Gemini server is temporarily busy (503). Please wait a few minutes and try again."
-    ) from last_error
+        "Gemini primary and fallback models are currently unavailable. "
+        "Please wait a few minutes and try again."
+    ) from (RuntimeError("; ".join(errors)) if errors else None)
+
 
 def process_and_add_bets(extracted_data, default_customer):
     valid_rows = []
@@ -141,7 +157,7 @@ if st.button("➕ အလိုအလျောက် တွက်ချက်၍ 
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = generate_with_retry(client, prompt)
+                    response = generate_with_fallback(client, prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, cust_manual)
@@ -171,7 +187,7 @@ if st.button("🤖 စာသားကို AI ဖြင့် ဖြန့်�
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = generate_with_retry(client, prompt)
+                    response = generate_with_fallback(client, prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, sms_customer)
@@ -214,7 +230,7 @@ with tab3:
                             try:
                                 client = genai.Client(api_key=gemini_api_key)
                                 prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
-                                response = generate_with_retry(client, [normalized_img, prompt])
+                                response = generate_with_fallback(client, [normalized_img, prompt])
                                 clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                                 extracted_data = json.loads(clean_text)
                                 valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, img_cust_fallback)
