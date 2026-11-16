@@ -30,7 +30,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 
 # Gemini API Key Input in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 Interactions API ဆက်တင်")
+st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
@@ -66,7 +66,7 @@ with tab1:
         elif not gemini_api_key:
             st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("Interinteractions API ကို အသုံးပြု၍ တွက်ချက်နေပါပြီ..."):
+            with st.spinner("ဂဏန်းများနှင့် ငွေပမာဏများကို အလိုအလျောက် တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
@@ -95,12 +95,12 @@ with tab1:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    interaction = client.interactions.create(
-                        model='gemini-4-hydrogen',
-                        input=prompt
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt
                     )
                     
-                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -137,7 +137,7 @@ with tab2:
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
     
-    if st.button("🤖 စာသားကို Interactions API ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
+    if st.button("🤖 စာသားကို AI ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not gemini_api_key:
@@ -165,12 +165,12 @@ with tab2:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    interaction = client.interactions.create(
-                        model='gemini-4-hydrogen',
-                        input=prompt
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt
                     )
                     
-                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -229,12 +229,12 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        interaction = client.interactions.create(
-                            model='gemini-4-hydrogen',
-                            input=[img, prompt]
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=[img, prompt]
                         )
                         
-                        clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         valid_rows = []
