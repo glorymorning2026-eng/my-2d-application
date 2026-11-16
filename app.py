@@ -38,6 +38,16 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 st.sidebar.markdown("---")
 st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
+primary_model = st.sidebar.text_input(
+    "အဓိက Gemini Model",
+    value="gemini-3.8-flash",
+    help="သင့် Google AI Studio API key တွင် ရရှိနိုင်သော model အမည်ကို ထည့်ပါ။",
+)
+fallback_model = st.sidebar.text_input(
+    "Fallback Gemini Model",
+    value="gemini-3.8-flash-lite",
+    help="အဓိက model မရပါက အသုံးပြုမည့် model အမည်။ မရရှိပါက ရရှိနိုင်သော model အမည်ဖြင့် ပြောင်းပါ။",
+)
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
 def normalize_image(uploaded_file):
@@ -65,19 +75,14 @@ Ensure each extracted bet amount is strictly between 100 and 50000 MMK.
 Return the result strictly as a raw JSON list of objects with keys: "Customer", "Number" (2-digit string "00"-"99"), and "Amount" (integer). No markdown formatting.
 """
 
-MODEL_CANDIDATES = [
-    # Confirm these names are enabled for the Gemini API key in use.
-    "gemini-3.8-flash",
-    "gemini-3.8-flash-lite",
-]
-
-
 def generate_with_fallback(client, contents):
     """Try the primary model, then a fallback model for temporary failures."""
     retry_delays = (0, 3, 7, 12)
     errors = []
 
-    for model_name in MODEL_CANDIDATES:
+    model_candidates = list(dict.fromkeys([primary_model.strip(), fallback_model.strip()]))
+    model_candidates = [name for name in model_candidates if name]
+    for model_name in model_candidates:
         for delay in retry_delays:
             if delay:
                 time.sleep(delay)
@@ -101,9 +106,11 @@ def generate_with_fallback(client, contents):
                 if not is_temporary:
                     raise
 
+    detail = errors[-1] if errors else "No model was configured."
     raise RuntimeError(
-        "Gemini primary and fallback models are currently unavailable. "
-        "Please wait a few minutes and try again."
+        "Gemini primary/fallback models မရရှိသေးပါ။ "
+        "Sidebar မှ model အမည်များကို စစ်ဆေးပါ။ "
+        f"နောက်ဆုံး API အကြောင်းကြားချက်: {detail}"
     ) from (RuntimeError("; ".join(errors)) if errors else None)
 
 
