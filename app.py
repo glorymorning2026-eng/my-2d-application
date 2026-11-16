@@ -100,16 +100,21 @@ def generate_with_fallback(client, contents):
                     or "HIGH DEMAND" in message
                 )
                 is_unavailable = "404" in message or "NOT_FOUND" in message
-                if is_unavailable:
-                    # This model is not enabled/available; move to the fallback.
+                is_quota_exhausted = (
+                    "429" in message
+                    or "RESOURCE_EXHAUSTED" in message
+                    or "QUOTA" in message
+                )
+                if is_unavailable or is_quota_exhausted:
+                    # Do not wait on an unavailable/exhausted model; move to fallback.
                     break
                 if not is_temporary:
                     raise
 
     detail = errors[-1] if errors else "No model was configured."
     raise RuntimeError(
-        "Gemini primary/fallback models မရရှိသေးပါ။ "
-        "Sidebar မှ model အမည်များကို စစ်ဆေးပါ။ "
+        "Gemini quota ပြည့်နေခြင်း သို့မဟုတ် model မရရှိခြင်းကြောင့် စာရင်းမဖတ်နိုင်သေးပါ။ "
+        "Google AI Studio quota ပြန်ဖွင့်ချိန်ကို စောင့်ပါ၊ သို့မဟုတ် billing/အခြား quota ရှိသော project ကို အသုံးပြုပါ။ "
         f"နောက်ဆုံး API အကြောင်းကြားချက်: {detail}"
     ) from (RuntimeError("; ".join(errors)) if errors else None)
 
