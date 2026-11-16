@@ -30,7 +30,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 
 # Gemini API Key Input in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 Interactions API ဆက်တင်")
+st.sidebar.subheader("🤖 API ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
@@ -66,7 +66,7 @@ with tab1:
         elif not gemini_api_key:
             st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("Interactions API (`client.interactions.create`) ကို အသုံးပြု၍ တွက်ချက်နေပါပြီ..."):
+            with st.spinner("Interactions API ဖြင့် တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
@@ -97,7 +97,7 @@ with tab1:
                     
                     interaction = client.interactions.create(
                         model='gemini-4-hydrogen',
-                        input=[{"role": "user", "parts": [{"text": prompt}]}]
+                        input=prompt
                     )
                     
                     clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
@@ -145,7 +145,7 @@ with tab2:
         elif not sms_customer or not sms_text_input:
             st.error("ဖောက်သည် အမည်နှင့် စာသားကို ဖြည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("AI က Interactions API ကိုသုံး၍ စာသားမက်ဆေ့ဂျ်များကို တွက်ချက်နေပါပြီ..."):
+            with st.spinner("AI က စာသားမက်ဆေ့ဂျ်များကို တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
@@ -167,7 +167,7 @@ with tab2:
                     
                     interaction = client.interactions.create(
                         model='gemini-4-hydrogen',
-                        input=[{"role": "user", "parts": [{"text": prompt}]}]
+                        input=prompt
                     )
                     
                     clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
@@ -207,13 +207,13 @@ with tab3:
         img = Image.open(uploaded_file)
         st.image(img, caption="တင်ထားသော စကရင်ရှော့ပုံ", width=300)
         
-        if st.button("🤖 ဓာတ်ပုံကို Interactions API ဖြင့် AI ဖတ်မည်"):
+        if st.button("🤖 ဓာတ်ပုံကို AI ဖြင့် ဖတ်မည်"):
             if is_closed:
                 st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
             elif not gemini_api_key:
                 st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
             else:
-                with st.spinner("AI က Interactions API ကိုသုံး၍ ပုံထဲပါသော စာရင်းများကို တွက်ချက်နေပါပြီ..."):
+                with st.spinner("AI က ဓာတ်ပုံထဲပါသော စာရင်းများကို တွက်ချက်နေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
@@ -229,13 +229,12 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        # Interactions API payload structure for multimodal image inputs
-                        interaction = client.interactions.create(
-                            model='gemini-4-hydrogen',
-                            input=[{"role": "user", "parts": [prompt, img]}]
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=[img, prompt]
                         )
                         
-                        clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         valid_rows = []
