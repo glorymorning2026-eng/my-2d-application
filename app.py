@@ -113,7 +113,7 @@ if st.button("➕ အလိုအလျောက် တွက်ချက်၍ 
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, cust_manual)
@@ -143,7 +143,7 @@ if st.button("🤖 စာသားကို AI ဖြင့် ဖြန့်�
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, sms_customer)
@@ -187,7 +187,7 @@ with tab3:
                                 client = genai.Client(api_key=gemini_api_key)
                                 prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
                                 response = client.models.generate_content(
-                                    model='gemini-2.5-flash',
+                                    model='gemini-3.8-flash',
                                     contents=[normalized_img, prompt]
                                     )
                                 clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
