@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+import time
 from PIL import Image, ImageOps
 from datetime import datetime
 from google import genai
@@ -63,6 +64,33 @@ E.g., '269ခွေအပူးပါ 500' or '269အပူးအပါ 500' mea
 Ensure each extracted bet amount is strictly between 100 and 50000 MMK.
 Return the result strictly as a raw JSON list of objects with keys: "Customer", "Number" (2-digit string "00"-"99"), and "Amount" (integer). No markdown formatting.
 """
+
+def generate_with_retry(client, contents):
+    """Call Gemini and retry temporary 503/high-demand responses."""
+    delays = (0, 3, 7, 12)
+    last_error = None
+    for delay in delays:
+        if delay:
+            time.sleep(delay)
+        try:
+            return client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=contents,
+            )
+        except Exception as exc:
+            message = str(exc).upper()
+            is_temporary = (
+                "503" in message
+                or "UNAVAILABLE" in message
+                or "HIGH DEMAND" in message
+            )
+            if not is_temporary:
+                raise
+            last_error = exc
+    raise RuntimeError(
+        "Gemini server is temporarily busy (503). Please wait a few minutes and try again."
+    ) from last_error
+
 def process_and_add_bets(extracted_data, default_customer):
     valid_rows = []
     blocked_found = []
@@ -113,7 +141,7 @@ if st.button("➕ အလိုအလျောက် တွက်ချက်၍ 
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
+                    response = generate_with_retry(client, prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, cust_manual)
@@ -143,7 +171,7 @@ if st.button("🤖 စာသားကို AI ဖြင့် ဖြန့်�
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
+                    response = generate_with_retry(client, prompt)
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, sms_customer)
@@ -186,10 +214,7 @@ with tab3:
                             try:
                                 client = genai.Client(api_key=gemini_api_key)
                                 prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
-                                response = client.models.generate_content(
-                                    model='gemini-3.8-flash',
-                                    contents=[normalized_img, prompt]
-                                    )
+                                response = generate_with_retry(client, [normalized_img, prompt])
                                 clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                                 extracted_data = json.loads(clean_text)
                                 valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, img_cust_fallback)
