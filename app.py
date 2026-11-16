@@ -30,7 +30,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 
 # Gemini API Key Input in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
+st.sidebar.subheader("🤖 Interactions API ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
@@ -50,18 +50,13 @@ tab1, tab2, tab3 = st.tabs(["✍️ ဂဏန်းနှင့်ငွေ ရ�
 
 with tab1:
     st.markdown("#### 💡 ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
-    st.markdown("*(ဥပမာ: `12@1000 10@1000 48_3000 39r1000 269ခွေအပူးပါ 500` စသဖြင့် ရေးနိုင်ပါသည်)*")
+    st.markdown("*(ဥပမာ: `12@1000 10@1000 48_3000 39@1000 269ခွေအပူးပါ 500` စသဖြင့် ရေးနိုင်ပါသည်)*")
     
     col1, col2 = st.columns([1, 2])
     with col1:
         cust_manual = st.text_input("ဖောက်သည် အမည်", key="c_man")
     with col2:
         smart_input_text = st.text_input("ထိုးသည့် 2D ဂဏန်းနှင့် ငွေပမာဏ (ရောနှောလျက်)", key="s_input", placeholder="12@1000 10@1000 48_3000")
-
-    # Smart parsing simulation / preview for manual input
-    if smart_input_text:
-        # Simple local preview calculation helper or trigger
-        pass
 
     if st.button("➕ အလိုအလျောက် တွက်ချက်၍ စာရင်းသွင်းမည်"):
         if is_closed:
@@ -71,23 +66,23 @@ with tab1:
         elif not gemini_api_key:
             st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("ဂဏန်းများနှင့် ငွေပမာဏများကို အလိုအလျောက် တွက်ချက်နေပါပြီ..."):
+            with st.spinner("Interinteractions API ကို အသုံးပြု၍ တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
-                    Analyze the following mixed betting input where numbers and amounts are written together (e.g., "12@1000 10@1000 48_3000", "39r1000", "269ခွေအပူးပါ 500", "2ပါ 500", etc.).
+                    Analyze the following mixed betting input where numbers and amounts are written together (e.g., "12@1000 10@1000 48_3000", "39@1000", "39r1000", "269ခွေအပူးပါ 500", "269ခွေ 500", "2ပါ 500", "2ဘရိတ် 300", "2B 300", "2bk 300", etc.).
                     Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these rules:
                     1. Reversed ('r', 'ရ', '@', '&', 'အာ'): E.g., '39@1000' or '65r1000' means both numbers and their reverses with the specified amount.
                     2. Khve / Permutation (အခွေ / ခွေ): 
                        - E.g., '269ခွေ 500' means 6 permutations (26, 29, 62, 69, 92, 96) with 500 MMK each.
-                       - E.g., '269ခွေအပူးပါ 500' means 6 permutations plus doubles (22, 66, 99 - total 9 numbers) with 500 MMK each.
-                    3. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' means all 19 numbers containing '2'.
-                    4. Break (ဘရိတ် variations like 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300' means all 10 numbers.
+                       - E.g., '269ခွေအပူးပါ 500' or '269အပူးအပါ 500' means 6 permutations plus doubles (22, 66, 99 - total 9 numbers) with 500 MMK each.
+                    3. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' or '2ပါတ် 500' means all 19 numbers containing '2'.
+                    4. Break (ဘရိတ် variations like 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300', '2B 300', '2bk 300' means all 10 numbers whose sum's last digit is 2 (02, 11, 20, 39, 93, 48, 84, 57, 75, 66).
                     5. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers.
                     6. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96.
-                    7. Direct pairs with amounts: E.g., '12@1000' -> Number '12', Amount 1000. '48_3000' -> Number '48', Amount 3000. Ensure each bet amount is between 100 and 50000 MMK.
+                    7. Direct pairs with amounts: E.g., '12@1000' -> Number '12', Amount 1000. '48_3000' -> Number '48', Amount 3000. Ensure each bet amount is strictly between 100 and 50000 MMK.
 
                     Customer Name is: "{cust_manual}"
                     Input text to analyze:
@@ -100,12 +95,12 @@ with tab1:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
+                    interaction = client.interactions.create(
+                        model='gemini-4-hydrogen',
+                        input=prompt
                     )
                     
-                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -142,7 +137,7 @@ with tab2:
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
     
-    if st.button("🤖 စာသားကို AI ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
+    if st.button("🤖 စာသားကို Interactions API ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not gemini_api_key:
@@ -156,8 +151,8 @@ with tab2:
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
-                    Analyze the following customer betting message text containing mixed entries and amounts.
-                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on standard rules (Reversed, Khve, Paat-Thie, Break, Ah-Pu, Nakhat, Direct pairs).
+                    Analyze the following customer betting message text containing mixed entries, abbreviations, and amounts.
+                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on standard rules (Reversed like r, @, &, Khve with/without Ah-Pu, Paat-Thie, Break like B/bk, Ah-Pu, Nakhat, Direct pairs).
 
                     Customer Name is: "{sms_customer}"
                     Message text to analyze:
@@ -170,12 +165,12 @@ with tab2:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
+                    interaction = client.interactions.create(
+                        model='gemini-4-hydrogen',
+                        input=prompt
                     )
                     
-                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -224,7 +219,7 @@ with tab3:
                         
                         prompt = """
                         You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99). 
-                        Analyze the provided image of customer betting messages/slips containing mixed Myanmar 2D shorthand terms and amounts. 
+                        Analyze the provided image of customer betting messages/slips containing mixed Myanmar 2D shorthand terms, Khve, reverse symbols (@, &, r), and amounts. 
                         Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK (between 100 and 50000).
 
                         Return the result strictly as a JSON list of objects, where each object has:
@@ -234,12 +229,12 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=[img, prompt]
+                        interaction = client.interactions.create(
+                            model='gemini-4-hydrogen',
+                            input=[img, prompt]
                         )
                         
-                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                        clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         valid_rows = []
@@ -302,7 +297,7 @@ if not st.session_state.data.empty:
         label="📥 စာရင်းအားလုံးကို CSV ဖိုင်ဖြင့် Download ဆွဲရန်",
         data=csv_data,
         file_name=f"2D_Sales_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime='text/css'
+        mime='text/csv'
     )
     
     if winning_number:
