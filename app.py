@@ -44,7 +44,8 @@ def expand_shorthand(customer, text_input, amount):
     if amount < 100 or amount > 50000:
         return "invalid_amount"
 
-    if 'r' in text or 'ရ' in text:
+    # Reversed symbols check
+    if any(sym in text for sym in ['r', 'ရ', '@', '&', 'အာ']):
         num_part = ''.join(filter(str.isdigit, text))
         if len(num_part) == 2:
             n1, n2 = num_part, num_part[::-1]
@@ -96,7 +97,7 @@ with tab1:
     with col1:
         cust = st.text_input("ဖောက်သည် အမည်", key="c1")
     with col2:
-        num_text = st.text_input("ထိုးသည့် 2D ဂဏန်း (သို့ အတိုကောက်)", key="n1")
+        num_text = st.text_input("ထိုးသည့် 2D ဂဏန်း (သို့ အတိုကောက်/အခွေ)", key="n1")
     with col3:
         amt = st.number_input("ထိုးငွေ ပမာဏ (၁၀၀ မှ ၅၀,၀၀၀ ထိ)", min_value=0, step=1000, key="a1")
 
@@ -130,7 +131,7 @@ with tab1:
 
 with tab2:
     st.markdown("#### 💬 ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ဤနေရာတွင် ကူးထည့်ပါ")
-    st.markdown("*(ဥပမာ: 2ပါ 500, 2ဘရိတ် 300, 2B 400, 34=300, 65r1000 စသည်ဖြင့် ရောနှောပါဝင်နိုင်သည်)*")
+    st.markdown("*(ဥပမာ: 269ခွေအပူးပါ 500, 39@1000, 2ပါ 500, 2ဘရိတ် 300 စသည်ဖြင့် ရောနှောပါဝင်နိုင်သည်)*")
     
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
@@ -143,20 +144,23 @@ with tab2:
         elif not sms_customer or not sms_text_input:
             st.error("ဖောက်သည် အမည်နှင့် စာသားကို ဖြည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("AI က အတိုကောက်များ (2ပါ, 2B, 2ဘရိတ် စသည်) ကို တွက်ချက်နေပါပြီ..."):
+            with st.spinner("AI က အခွေ၊ ပြောင်းပြန်သင်္ကေတ (@, &, r) နှင့် အတိုကောက်များကို တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
-                    Analyze the following customer betting message text which may contain mixed entries, abbreviations, and amounts (e.g., "2ပါ 500", "2ဘရိတ် 300", "2B 400", "2bk 500", "34=300", "65r1000", etc.).
+                    Analyze the following customer betting message text which may contain mixed entries, abbreviations, and amounts.
                     Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these rules:
-                    1. Reversed ('r' or 'ရ'): E.g., '39 r 1000' or '65r1000' means both numbers and their reverses.
-                    2. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' or '2ပါတ် 500' means all 19 numbers containing '2' with 500 MMK each.
-                    3. Break (ဘရိတ် variations like 'ဘရိတ်', 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300', '2B 300', or '2bk 300' means all 10 numbers whose sum's last digit is 2 (02, 11, 20, 39, 93, 48, 84, 57, 75, 66) with 300 MMK each.
-                    4. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers with 500 MMK each.
-                    5. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96 with specified amount each.
-                    6. Direct numbers with mixed amounts: E.g., '34=300'. Ensure each extracted bet amount is between 100 and 50000 MMK.
+                    1. Reversed ('r', 'ရ', '@', '&', 'အာ'): E.g., '39@1000' or '65r1000' or '39ရ1000' means both numbers and their reverses.
+                    2. Khve / Permutation (အခွေ / ခွေ): 
+                       - E.g., '269ခွေ' or '269အခွေ' means permutations of the digits (26, 29, 62, 69, 92, 96 - total 6 numbers).
+                       - If it mentions doubles like '269ခွေအပူးပါ', '269အပူးအပါ', or '269ပူပါ', include both the 6 permutations AND their double numbers (22, 66, 99 - total 9 numbers).
+                    3. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' means all 19 numbers containing '2'.
+                    4. Break (ဘရိတ် variations like 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300' means all 10 numbers whose sum's last digit is 2.
+                    5. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers.
+                    6. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96.
+                    7. Direct numbers with mixed amounts: E.g., '34=300'. Ensure each extracted bet amount is between 100 and 50000 MMK.
 
                     Customer Name is: "{sms_customer}"
                     Message text to analyze:
@@ -170,7 +174,7 @@ with tab2:
                     """
                     
                     interaction = client.interactions.create(
-                        model='gemini-4-hydrogen',
+                        model='gemini-2.5-flash',
                         input=prompt
                     )
                     
@@ -217,13 +221,13 @@ with tab3:
             elif not gemini_api_key:
                 st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
             else:
-                with st.spinner("AI က ပုံထဲပါသော အတိုကောက်စာရင်းများကို တွက်ချက်နေပါပြီ..."):
+                with st.spinner("AI က ပုံထဲပါသော အခွေ၊ ပြောင်းပြန်သင်္ကေတများကို တွက်ချက်နေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
                         prompt = """
                         You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99). 
-                        Analyze the provided image of customer betting messages/slips containing abbreviations like '2ပါ', '2B', '2ဘရိတ်', etc. 
+                        Analyze the provided image of customer betting messages/slips containing abbreviations like Khve (အခွေ), reverse symbols (@, &, r, ရ), etc. 
                         Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK (between 100 and 50000).
 
                         Return the result strictly as a JSON list of objects, where each object has:
@@ -234,7 +238,7 @@ with tab3:
                         """
                         
                         interaction = client.interactions.create(
-                            model='gemini-4-hydrogen',
+                            model='gemini-2.5-flash',
                             input=[img, prompt]
                         )
                         
