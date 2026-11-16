@@ -30,7 +30,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 
 # Gemini API Key Input in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
+st.sidebar.subheader("🤖 Interactions API ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
@@ -66,7 +66,7 @@ with tab1:
         elif not gemini_api_key:
             st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("ဂဏန်းများနှင့် ငွေပမာဏများကို အလိုအလျောက် တွက်ချက်နေပါပြီ..."):
+            with st.spinner("Interactions API (`client.interactions.create`) ကို အသုံးပြု၍ တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
@@ -95,12 +95,12 @@ with tab1:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
+                    interaction = client.interactions.create(
+                        model='gemini-4-hydrogen',
+                        input=[{"role": "user", "parts": [{"text": prompt}]}]
                     )
                     
-                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -137,7 +137,7 @@ with tab2:
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
     
-    if st.button("🤖 စာသားကို AI ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
+    if st.button("🤖 စာသားကို Interactions API ဖြင့် အလိုအလျောက် ဖြန့်ကျက်ဖတ်မည်"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not gemini_api_key:
@@ -145,14 +145,14 @@ with tab2:
         elif not sms_customer or not sms_text_input:
             st.error("ဖောက်သည် အမည်နှင့် စာသားကို ဖြည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("AI က စာသားမက်ဆေ့ဂျ်များကို တွက်ချက်နေပါပြီ..."):
+            with st.spinner("AI က Interactions API ကိုသုံး၍ စာသားမက်ဆေ့ဂျ်များကို တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
                     Analyze the following customer betting message text containing mixed entries, abbreviations, and amounts.
-                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on standard rules (Reversed like r, @, &, Khve with/without Ah-Pu, Paat-Thie, Break like B/bk, Ah-Pu, Nakhat, Direct pairs).
+                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on standard rules.
 
                     Customer Name is: "{sms_customer}"
                     Message text to analyze:
@@ -165,12 +165,12 @@ with tab2:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
+                    interaction = client.interactions.create(
+                        model='gemini-4-hydrogen',
+                        input=[{"role": "user", "parts": [{"text": prompt}]}]
                     )
                     
-                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
@@ -207,13 +207,13 @@ with tab3:
         img = Image.open(uploaded_file)
         st.image(img, caption="တင်ထားသော စကရင်ရှော့ပုံ", width=300)
         
-        if st.button("🤖 ဓာတ်ပုံထဲမှ စာရင်းများကို AI ဖြင့် ဖတ်မည်"):
+        if st.button("🤖 ဓာတ်ပုံကို Interactions API ဖြင့် AI ဖတ်မည်"):
             if is_closed:
                 st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
             elif not gemini_api_key:
                 st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
             else:
-                with st.spinner("AI က ပုံထဲပါသော စာရင်းများကို တွက်ချက်နေပါပြီ..."):
+                with st.spinner("AI က Interactions API ကိုသုံး၍ ပုံထဲပါသော စာရင်းများကို တွက်ချက်နေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
@@ -229,12 +229,13 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=[img, prompt]
+                        # Interactions API payload structure for multimodal image inputs
+                        interaction = client.interactions.create(
+                            model='gemini-4-hydrogen',
+                            input=[{"role": "user", "parts": [prompt, img]}]
                         )
                         
-                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                        clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         valid_rows = []
