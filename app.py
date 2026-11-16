@@ -4,7 +4,6 @@ import json
 from PIL import Image, ImageOps
 from datetime import datetime
 from google import genai
-​Page Config
 ​st.set_page_config(page_title="Myanmar 2D Dealer App", page_icon="📒", layout="wide")
 ​st.markdown("""
 <style>
@@ -23,28 +22,23 @@ color: #D97706;
 </style>
 """, unsafe_allow_html=True)
 ​st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Smart Ledger & AI Screenshot Reader</p></div>', unsafe_allow_html=True)
-​Sidebar Settings
 ​st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=50000, step=5000)
 payout_rate = st.sidebar.number_input("ဆုကြေးနှုန်း (ဆ)", value=80, step=5)
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
-​Closing Time Control
 ​st.sidebar.markdown("---")
 st.sidebar.subheader("⏰ အချိန်ပိတ်ရက် ထိန်းချုပ်မှု")
 enable_time_lock = st.sidebar.checkbox("အချိန်ပိတ်ရန် ဖွင့်မည်", value=False)
 closing_time = st.sidebar.time_input("ပိတ်မည့် အချိန်", value=datetime.strptime("12:00", "%H:%M").time())
-​Blocked Numbers Control
 ​st.sidebar.markdown("---")
 st.sidebar.subheader("🚫 ပိတ်ဂဏန်းများ (Comma ခြားရန်)")
 blocked_input = st.sidebar.text_input("မခံမည့် ဂဏန်းများ (ဥပမာ: 39, 88)", value="")
 blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip()]
-​Gemini API Key Input in Sidebar
 ​st.sidebar.markdown("---")
 st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 ​if 'data' not in st.session_state:
 st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
-​Image Normalization Helper
 ​def normalize_image(uploaded_file):
 img = Image.open(uploaded_file)
 img = ImageOps.exif_transpose(img)
@@ -54,7 +48,6 @@ max_edge = 1600
 if max(img.size) > max_edge:
 img.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
 return img
-​Core AI Rules Prompt
 ​SYSTEM_RULES = """
 You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
 Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these strict rules:
@@ -89,7 +82,6 @@ valid_rows.append({"Customer": cust_name, "Number": num_str, "Amount": amt_val})
 total_added_amount += amt_val
 ​return valid_rows, blocked_found, invalid_amt_found, total_added_amount
 ​st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ")
-​Time check warning
 ​is_closed = False
 if enable_time_lock:
 current_time = datetime.now().time()
@@ -101,7 +93,6 @@ st.error(f"⚠️ သတိပေးချက် - စာရင်းပိတ�
 "💬 ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်",
 "📸 စကရင်ရှော့ ပုံတင်၍ AI ဖတ်ရန်"
 ])
-​TAB 1: Smart Input
 ​with tab1:
 st.markdown("#### 💡 ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
 st.caption("ဥပမာ: 12@1000 10@1000 48_3000 269ခွေအပူးပါ 500 2ပါ 500 2B 300")
@@ -136,7 +127,6 @@ else:
 st.warning("သတ်မှတ်ချက်နှင့် ကိုက်ညီသော စာရင်းမတွေ့ပါ။")
 except Exception as e:
 st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
-​TAB 2: SMS Paste
 ​with tab2:
 st.markdown("#### 💬 ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ကူးထည့်ပါ")
 sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust", placeholder="ဥပမာ - မောင်မောင်")
@@ -167,7 +157,6 @@ else:
 st.warning("သတ်မှတ်ချက်နှင့် ကိုက်ညီသော စာရင်းမတွေ့ပါ။")
 except Exception as e:
 st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
-​TAB 3: Screenshot Reader
 ​with tab3:
 st.markdown("#### 📸 စကရင်ရှော့ (သို့) ဖုန်းဓာတ်ပုံတင်၍ စာရင်းဖတ်ရန်")
 st.info("💡 ဓာတ်ပုံတင်ပြီး စာရင်းကို ဖတ်ကြည့်ပါ (PNG, JPG, JPEG ဖိုင်များ တင်နိုင်ပါသည်)")
@@ -218,7 +207,6 @@ except Exception as img_err:
 st.error(f"ပုံဖိုင် ဖွင့်ရာတွင် အမှားရှိနေပါသည်: {img_err}")
 else:
 st.caption("ပုံမတက်သေးပါ — အပေါ်ပါခလုတ်မှ စကရင်ရှော့ပုံကို ရွေးချယ်နိုင်ပါသည်။")
-​LEDGER & REPORTING SECTION
 ​st.markdown("---")
 if not st.session_state.data.empty:
 df = st.session_state.data
@@ -241,7 +229,7 @@ for idx, row in cust_df.iterrows():
 cust_text += f"• {row['Number']} = {row['Amount']:,} ကျပ်\n"
 cust_text += "-" * 25 + "\n"
 cust_text += f"စုစုပေါင်း = {cust_total:,} ကျပ်"
-​st.text_area("Viber / Telegram သို့ ပြန်ပို့ရန် စာသား", cust_text, height=160)
+​st.text_area("Viber / Messenger သို့ ပြန်ပို့ရန် စာသား", cust_text, height=160)
 ​col_left, col_right = st.columns(2)
 ​with col_left:
 st.subheader("📊 ဂဏန်းအလိုက် စုစုပေါင်းနှင့် ကန့်သတ်ချက် (Limit Control)")
