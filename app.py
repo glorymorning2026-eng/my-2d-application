@@ -36,50 +36,6 @@ gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", t
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
 
-# Helper function to expand shorthand manually if needed
-def expand_shorthand(customer, text_input, amount):
-    text = text_input.strip().lower()
-    entries = []
-    
-    if amount < 100 or amount > 50000:
-        return "invalid_amount"
-
-    # Reversed symbols check
-    if any(sym in text for sym in ['r', 'ရ', '@', '&', 'အာ']):
-        num_part = ''.join(filter(str.isdigit, text))
-        if len(num_part) == 2:
-            n1, n2 = num_part, num_part[::-1]
-            entries.append({"Customer": customer, "Number": n1, "Amount": amount})
-            if n1 != n2:
-                entries.append({"Customer": customer, "Number": n2, "Amount": amount})
-            return entries
-
-    if 'ပါတ်' in text or 'ပတ်' in text or text.endswith('ပါ') or text.endswith('ပ'):
-        p_num = ''.join(filter(str.isdigit, text))
-        if len(p_num) == 1:
-            for i in range(10):
-                for n_str in [f"{p_num}{i}", f"{i}{p_num}"]:
-                    if n_str not in [e["Number"] for e in entries]:
-                        entries.append({"Customer": customer, "Number": n_str, "Amount": amount})
-            return entries
-
-    if 'ပူ' in text:
-        for i in range(10):
-            entries.append({"Customer": customer, "Number": f"{i}{i}", "Amount": amount})
-        return entries
-
-    if 'နက္ခတ်' in text or 'နက္ခ' in text:
-        nakhat_pairs = ["07", "70", "18", "81", "24", "42", "35", "53", "69", "96"]
-        for n_str in nakhat_pairs:
-            entries.append({"Customer": customer, "Number": n_str, "Amount": amount})
-        return entries
-
-    num_clean = ''.join(filter(str.isdigit, text))
-    if len(num_clean) == 2:
-        entries.append({"Customer": customer, "Number": num_clean, "Amount": amount})
-        
-    return entries
-
 st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ")
 
 # Time check warning
@@ -90,49 +46,99 @@ if enable_time_lock:
         is_closed = True
         st.error(f"⚠️ သတိပေးချက် - စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်သွားပြီဖြစ်၍ စာရင်းအသစ် လက်မခံတော့ပါ။")
 
-tab1, tab2, tab3 = st.tabs(["✍️ လက်ဖြင့် / အတိုကောက် ရိုက်ထည့်ရန်", "💬 ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်", "📸 စကရင်ရှော့ ပုံတင်၍ AI ဖတ်ရန်"])
+tab1, tab2, tab3 = st.tabs(["✍️ ဂဏန်းနှင့်ငွေ ရောနှောရိုက်ထည့်ရန် (Smart Input)", "💬 ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်", "📸 စကရင်ရှော့ ပုံတင်၍ AI ဖတ်ရန်"])
 
 with tab1:
-    col1, col2, col3 = st.columns(3)
+    st.markdown("#### 💡 ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
+    st.markdown("*(ဥပမာ: `12@1000 10@1000 48_3000 39r1000 269ခွေအပူးပါ 500` စသဖြင့် ရေးနိုင်ပါသည်)*")
+    
+    col1, col2 = st.columns([1, 2])
     with col1:
-        cust = st.text_input("ဖောက်သည် အမည်", key="c1")
+        cust_manual = st.text_input("ဖောက်သည် အမည်", key="c_man")
     with col2:
-        num_text = st.text_input("ထိုးသည့် 2D ဂဏန်း (သို့ အတိုကောက်/အခွေ)", key="n1")
-    with col3:
-        amt = st.number_input("ထိုးငွေ ပမာဏ (၁၀၀ မှ ၅၀,၀၀၀ ထိ)", min_value=0, step=1000, key="a1")
+        smart_input_text = st.text_input("ထိုးသည့် 2D ဂဏန်းနှင့် ငွေပမာဏ (ရောနှောလျက်)", key="s_input", placeholder="12@1000 10@1000 48_3000")
 
-    if st.button("➕ စာရင်းသွင်းမည်"):
+    # Smart parsing simulation / preview for manual input
+    if smart_input_text:
+        # Simple local preview calculation helper or trigger
+        pass
+
+    if st.button("➕ အလိုအလျောက် တွက်ချက်၍ စာရင်းသွင်းမည်"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
-        elif cust and num_text and amt > 0:
-            if amt < 100 or amt > 50000:
-                st.error("❌ ထိုးငွေပမာဏသည် တစ်ကွက်လျှင် အနည်းဆုံး ၁၀၀ ကျပ်မှ အများဆုံး ၅၀,၀၀၀ ကျပ် အတွင်းသာ ဖြစ်ရပါမည်။")
-            else:
-                expanded_rows = expand_shorthand(cust, num_text, amt)
-                if expanded_rows:
+        elif not cust_manual or not smart_input_text:
+            st.warning("ဖောက်သည် အမည်နှင့် ထိုးမည့် စာသားကို ဖြည့်သွင်းပါ။")
+        elif not gemini_api_key:
+            st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
+        else:
+            with st.spinner("ဂဏန်းများနှင့် ငွေပမာဏများကို အလိုအလျောက် တွက်ချက်နေပါပြီ..."):
+                try:
+                    client = genai.Client(api_key=gemini_api_key)
+                    
+                    prompt = f"""
+                    You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
+                    Analyze the following mixed betting input where numbers and amounts are written together (e.g., "12@1000 10@1000 48_3000", "39r1000", "269ခွေအပူးပါ 500", "2ပါ 500", etc.).
+                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these rules:
+                    1. Reversed ('r', 'ရ', '@', '&', 'အာ'): E.g., '39@1000' or '65r1000' means both numbers and their reverses with the specified amount.
+                    2. Khve / Permutation (အခွေ / ခွေ): 
+                       - E.g., '269ခွေ 500' means 6 permutations (26, 29, 62, 69, 92, 96) with 500 MMK each.
+                       - E.g., '269ခွေအပူးပါ 500' means 6 permutations plus doubles (22, 66, 99 - total 9 numbers) with 500 MMK each.
+                    3. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' means all 19 numbers containing '2'.
+                    4. Break (ဘရိတ် variations like 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300' means all 10 numbers.
+                    5. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers.
+                    6. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96.
+                    7. Direct pairs with amounts: E.g., '12@1000' -> Number '12', Amount 1000. '48_3000' -> Number '48', Amount 3000. Ensure each bet amount is between 100 and 50000 MMK.
+
+                    Customer Name is: "{cust_manual}"
+                    Input text to analyze:
+                    {smart_input_text}
+
+                    Return the result strictly as a JSON list of objects, where each object has:
+                    - "Customer": string ("{cust_manual}")
+                    - "Number": string (2D 2-digit number from "00" to "99")
+                    - "Amount": integer (Bet amount for that specific number in MMK, strictly between 100 and 50000)
+                    Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
+                    """
+                    
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt
+                    )
+                    
+                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                    extracted_data = json.loads(clean_text)
+                    
                     valid_rows = []
                     blocked_found = []
-                    for row in expanded_rows:
+                    invalid_amt_found = 0
+                    total_added_amount = 0
+                    
+                    for row in extracted_data:
+                        amt_val = int(row["Amount"])
+                        if amt_val < 100 or amt_val > 50000:
+                            invalid_amt_found += 1
+                            continue
                         if row["Number"] in blocked_numbers:
                             blocked_found.append(row["Number"])
                         else:
                             valid_rows.append(row)
+                            total_added_amount += amt_val
                     
                     if valid_rows:
                         new_df = pd.DataFrame(valid_rows)
                         st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
-                        st.success(f"✅ စာရင်းသွင်းပြီးပါပြီ - ဖောက်သည် ({cust}) / စုစုပေါင်း အကွက် {len(valid_rows)} ကွက်")
-                    if blocked_found:
-                        st.warning(f"🚫 ပိတ်ထားသောဂဏန်းများ ပါဝင်နေသဖြင့် ထည့်မပေးပါ။ (ပိတ်ဂဏန်း: {', '.join(set(blocked_found))})")
-                else:
-                    st.warning("ထည့်သွင်းထားသော ဂဏန်းပုံစံ မမှန်ကန်ပါ။")
-        else:
-            st.warning("အချက်အလက် အပြည့်အစုံ ဖြည့်ပါ။")
+                        st.success(f"🎉 အောင်မြင်ပါပြီ! ဖောက်သည် ({cust_manual}) ၏ စုစုပေါင်းထိုးငွေ = {total_added_amount:,} ကျပ် (အကွက်ပေါင်း {len(valid_rows)} ကွက်) ထည့်သွင်းပြီးပါပြီ။")
+                        if invalid_amt_found > 0:
+                            st.info(f"ℹ️ မှတ်ချက်။ ။ ငွေပမာဏ ၁၀၀ မှ ၅၀,၀၀၀ အတွင်း မဟုတ်သော ကွက် {invalid_amt_found} ကွက်ကို ဖယ်ထုတ်ထားပါသည်။")
+                        st.rerun()
+                    else:
+                        st.warning("ဖတ်ရရှိသော စာရင်းများတွင် သတ်မှတ်ချက်နှင့် မကိုက်ညီသည်များ (သို့မဟုတ် ပိတ်ဂဏန်းများ) သာ ပါဝင်နေပါသည်။")
+                        
+                except Exception as e:
+                    st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
 
 with tab2:
     st.markdown("#### 💬 ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ဤနေရာတွင် ကူးထည့်ပါ")
-    st.markdown("*(ဥပမာ: 269ခွေအပူးပါ 500, 39@1000, 2ပါ 500, 2ဘရိတ် 300 စသည်ဖြင့် ရောနှောပါဝင်နိုင်သည်)*")
-    
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=120)
     
@@ -144,23 +150,14 @@ with tab2:
         elif not sms_customer or not sms_text_input:
             st.error("ဖောက်သည် အမည်နှင့် စာသားကို ဖြည့်သွင်းပေးပါ။")
         else:
-            with st.spinner("AI က အခွေ၊ ပြောင်းပြန်သင်္ကေတ (@, &, r) နှင့် အတိုကောက်များကို တွက်ချက်နေပါပြီ..."):
+            with st.spinner("AI က စာသားမက်ဆေ့ဂျ်များကို တွက်ချက်နေပါပြီ..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
                     prompt = f"""
                     You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99).
-                    Analyze the following customer betting message text which may contain mixed entries, abbreviations, and amounts.
-                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on these rules:
-                    1. Reversed ('r', 'ရ', '@', '&', 'အာ'): E.g., '39@1000' or '65r1000' or '39ရ1000' means both numbers and their reverses.
-                    2. Khve / Permutation (အခွေ / ခွေ): 
-                       - E.g., '269ခွေ' or '269အခွေ' means permutations of the digits (26, 29, 62, 69, 92, 96 - total 6 numbers).
-                       - If it mentions doubles like '269ခွေအပူးပါ', '269အပူးအပါ', or '269ပူပါ', include both the 6 permutations AND their double numbers (22, 66, 99 - total 9 numbers).
-                    3. Paat-Thie (ပါတ်သီး variations like 'ပါတ်', 'ပတ်', 'ပါ', 'ပ'): E.g., '2ပါ 500' means all 19 numbers containing '2'.
-                    4. Break (ဘရိတ် variations like 'ဘရိတ်', 'B', 'bk'): E.g., '2ဘရိတ် 300' means all 10 numbers whose sum's last digit is 2.
-                    5. Ah-Pu (အပူ): E.g., 'အပူ 500' means all 10 double numbers.
-                    6. Nakhat (နက္ခတ်): 07, 70, 18, 81, 24, 42, 35, 53, 69, 96.
-                    7. Direct numbers with mixed amounts: E.g., '34=300'. Ensure each extracted bet amount is between 100 and 50000 MMK.
+                    Analyze the following customer betting message text containing mixed entries and amounts.
+                    Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK based on standard rules (Reversed, Khve, Paat-Thie, Break, Ah-Pu, Nakhat, Direct pairs).
 
                     Customer Name is: "{sms_customer}"
                     Message text to analyze:
@@ -173,17 +170,18 @@ with tab2:
                     Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                     """
                     
-                    interaction = client.interactions.create(
+                    response = client.models.generate_content(
                         model='gemini-2.5-flash',
-                        input=prompt
+                        contents=prompt
                     )
                     
-                    clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                    clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
                     
                     valid_rows = []
                     blocked_found = []
                     invalid_amt_found = 0
+                    total_added_amount = 0
                     
                     for row in extracted_data:
                         amt_val = int(row["Amount"])
@@ -194,16 +192,15 @@ with tab2:
                             blocked_found.append(row["Number"])
                         else:
                             valid_rows.append(row)
+                            total_added_amount += amt_val
                     
                     if valid_rows:
                         new_df = pd.DataFrame(valid_rows)
                         st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
-                        st.success("🎉 စာသားမက်ဆေ့ဂျ်ထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီး ဇယားထဲ ထည့်သွင်းပြီးပါပြီ!")
-                        if invalid_amt_found > 0:
-                            st.info(f"ℹ️ မှတ်ချက်။ ။ ငွေပမာဏ ၁၀၀ မှ ၅၀,၀၀၀ အတွင်း မဟုတ်သော ကွက် {invalid_amt_found} ကွက်ကို ဖယ်ထုတ်ထားပါသည်။")
+                        st.success(f"🎉 စာသားမက်ဆေ့ဂျ်ထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီးပါပြီ! စုစုပေါင်းထိုးငွေ = {total_added_amount:,} ကျပ်")
                         st.rerun()
                     else:
-                        st.warning("ဖတ်ရရှိသော စာရင်းများတွင် သတ်မှတ်ချက်နှင့် မကိုက်ညီသည်များ (သို့မဟုတ် ပိတ်ဂဏန်းများ) သာ ပါဝင်နေပါသည်။")
+                        st.warning("ဖတ်ရရှိသော စာရင်းများတွင် သတ်မှတ်ချက်နှင့် မကိုက်ညီသည်များ ပါဝင်နေပါသည်။")
                         
                 except Exception as e:
                     st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
@@ -221,13 +218,13 @@ with tab3:
             elif not gemini_api_key:
                 st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်မီနူး (Sidebar) တွင် Gemini API Key ထည့်သွင်းပေးပါ။")
             else:
-                with st.spinner("AI က ပုံထဲပါသော အခွေ၊ ပြောင်းပြန်သင်္ကေတများကို တွက်ချက်နေပါပြီ..."):
+                with st.spinner("AI က ပုံထဲပါသော စာရင်းများကို တွက်ချက်နေပါပြီ..."):
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         
                         prompt = """
                         You are an expert AI assistant for a Myanmar 2D lottery business managing 100 numbers (00 to 99). 
-                        Analyze the provided image of customer betting messages/slips containing abbreviations like Khve (အခွေ), reverse symbols (@, &, r, ရ), etc. 
+                        Analyze the provided image of customer betting messages/slips containing mixed Myanmar 2D shorthand terms and amounts. 
                         Extract and expand ALL bets into individual 2-digit numbers ("00" to "99") and their exact amounts in MMK (between 100 and 50000).
 
                         Return the result strictly as a JSON list of objects, where each object has:
@@ -237,16 +234,17 @@ with tab3:
                         Do not include any extra text, markdown formatting like ```json, just the raw JSON list.
                         """
                         
-                        interaction = client.interactions.create(
+                        response = client.models.generate_content(
                             model='gemini-2.5-flash',
-                            input=[img, prompt]
+                            contents=[img, prompt]
                         )
                         
-                        clean_text = interaction.output_text.strip().replace("```json", "").replace("```", "").strip()
+                        clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                         extracted_data = json.loads(clean_text)
                         
                         valid_rows = []
                         blocked_found = []
+                        total_added_amount = 0
                         for row in extracted_data:
                             amt_val = int(row["Amount"])
                             if amt_val < 100 or amt_val > 50000:
@@ -255,11 +253,12 @@ with tab3:
                                 blocked_found.append(row["Number"])
                             else:
                                 valid_rows.append(row)
+                                total_added_amount += amt_val
                         
                         if valid_rows:
                             new_df = pd.DataFrame(valid_rows)
                             st.session_state.data = pd.concat([st.session_state.data, new_df], ignore_index=True)
-                            st.success("🎉 ပုံထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီး ဇယားထဲ ထည့်သွင်းပြီးပါပြီ!")
+                            st.success(f"🎉 အောင်မြင်ပါပြီ! စုစုပေါင်းထိုးငွေ = {total_added_amount:,} ကျပ် ထည့်သွင်းပြီးပါပြီ။")
                             st.rerun()
                         else:
                             st.warning("ဖတ်ရရှိသော စာရင်းများတွင် ပိတ်ထားသောဂဏန်းများ သို့မဟုတ် သတ်မှတ်ငွေပမာဏပြင်ပ ရောက်နေသည်များသာ ပါဝင်နေပါသည်။")
@@ -303,7 +302,7 @@ if not st.session_state.data.empty:
         label="📥 စာရင်းအားလုံးကို CSV ဖိုင်ဖြင့် Download ဆွဲရန်",
         data=csv_data,
         file_name=f"2D_Sales_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime='text/csv'
+        mime='text/css'
     )
     
     if winning_number:
