@@ -135,7 +135,7 @@ with tab1:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-4-hydrogen', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
@@ -169,7 +169,7 @@ with tab2:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-4-hydrogen', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
@@ -218,7 +218,7 @@ with tab3:
                                     prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
                                     
                                     response = client.models.generate_content(
-                                        model='gemini-2.0-flash',
+                                        model='gemini-4-hydrogen',
                                         contents=[normalized_img, prompt]
                                     )
                                     
