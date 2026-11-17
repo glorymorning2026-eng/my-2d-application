@@ -24,11 +24,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Smart Ledger & AI Screenshot Reader</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Smart Ledger & Weekly Report Automation</p></div>', unsafe_allow_html=True)
 
+# Sidebar Settings
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=50000, step=5000)
 payout_rate = st.sidebar.number_input("ဆုကြေးနှုန်း (ဆ)", value=80, step=5)
+commission_pct = st.sidebar.number_input("ကော်မရှင် (%)", value=10, step=1)
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
 
 st.sidebar.markdown("---")
@@ -46,7 +48,7 @@ st.sidebar.subheader("🤖 AI စနစ် ဆက်တင်")
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
 if 'data' not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
+    st.session_state.data = pd.DataFrame(columns=["Day", "Customer", "Number", "Amount"])
 
 def normalize_image(uploaded_file):
     img = Image.open(uploaded_file)
@@ -74,7 +76,7 @@ Ensure each extracted bet amount is strictly between 100 and 50000 MMK.
 Return the result strictly as a raw JSON list of objects with keys: "Customer", "Number" (2-digit string "00"-"99"), and "Amount" (integer). No markdown formatting.
 """
 
-def process_and_add_bets(extracted_data, default_customer):
+def process_and_add_bets(extracted_data, selected_day, default_customer):
     valid_rows = []
     blocked_found = []
     invalid_amt_found = 0
@@ -91,7 +93,7 @@ def process_and_add_bets(extracted_data, default_customer):
         if num_str in blocked_numbers:
             blocked_found.append(num_str)
         else:
-            valid_rows.append({"Customer": cust_name, "Number": num_str, "Amount": amt_val})
+            valid_rows.append({"Day": selected_day, "Customer": cust_name, "Number": num_str, "Amount": amt_val})
             total_added_amount += amt_val
             
     return valid_rows, blocked_found, invalid_amt_found, total_added_amount
@@ -105,6 +107,8 @@ if enable_time_lock:
         is_closed = True
         st.error(f"⚠️ သတိပေးချက် - စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်သွားပြီဖြစ်၍ စာရင်းအသစ် လက်မခံတော့ပါ။")
 
+selected_day = st.selectbox("📅 စာရင်းသွင်းမည့် ရက် (Day)", ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "WEEKEND"])
+
 tab1, tab2, tab3 = st.tabs([
     "✍️ ဂဏန်းနှင့်ငွေ ရောနှောရိုက်ထည့်ရန် (Smart Input)", 
     "💬 ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်", 
@@ -113,8 +117,6 @@ tab1, tab2, tab3 = st.tabs([
 
 with tab1:
     st.markdown("#### 💡 ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
-    st.caption("ဥပမာ: 12@1000 10@1000 48_3000 269ခွေအပူးပါ 500 2ပါ 500 2B 300")
-    
     col1, col2 = st.columns([1, 2])
     with col1:
         cust_manual = st.text_input("ဖောက်သည် အမည်", key="c_man", placeholder="ဥပမာ - Hnin")
@@ -133,15 +135,15 @@ with tab1:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
-                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, cust_manual)
+                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, selected_day, cust_manual)
                     
                     if valid_rows:
                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                        st.success(f"🎉 စာရင်းသွင်းပြီးပါပြီ! ({cust_manual}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                        st.success(f"🎉 စာရင်းသွင်းပြီးပါပြီ! ({selected_day} - {cust_manual}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                         if blocked_found:
                             st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                         st.rerun()
@@ -167,15 +169,15 @@ with tab2:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
-                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, sms_customer)
+                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, selected_day, sms_customer)
                     
                     if valid_rows:
                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                        st.success(f"🎉 စာသားဖတ်ရှုပြီးပါပြီ! စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                        st.success(f"🎉 စာသားဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                         if blocked_found:
                             st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                         st.rerun()
@@ -186,8 +188,6 @@ with tab2:
 
 with tab3:
     st.markdown("#### 📸 စကရင်ရှော့ (သို့) ဖုန်းဓာတ်ပုံတင်၍ စာရင်းဖတ်ရန်")
-    st.info("💡 ဓာတ်ပုံတင်ပြီး စာရင်းကို ဖတ်ကြည့်ပါ (PNG, JPG, JPEG ဖိုင်များ တင်နိုင်ပါသည်)")
-    
     img_cust_fallback = st.text_input("ဖောက်သည် အမည် (ပုံထဲတွင် အမည်မပါပါက ထည့်ရန်)", value="Screenshot Customer", key="img_cust")
     uploaded_file = st.file_uploader("ဖောက်သည် ပို့ထားသော စကရင်ရှော့ ပုံရွေးချယ်ပါ", type=["png", "jpg", "jpeg"])
     
@@ -204,7 +204,7 @@ with tab3:
                     st.markdown("**ဖိုင်အချက်အလက် (Metadata):**")
                     st.write(f"• ဖိုင်အမည်: `{uploaded_file.name}`")
                     st.write(f"• ချိန်ညှိပြီး အရွယ်အစား: `{normalized_img.size[0]} x {normalized_img.size[1]} px`")
-                    st.write("• အခြေအနေ: ✅ စာရင်းဖတ်ရန် အသင့်ဖြစ်ပါပြီ")
+                    st.write(f"• သတ်မှတ်ရက်: `{selected_day}`")
                     
                     if st.button("🤖 ဓာတ်ပုံထဲမှ စာရင်းများကို AI ဖြင့် ဖတ်မည်", type="primary"):
                         if is_closed:
@@ -218,17 +218,17 @@ with tab3:
                                     prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
                                     
                                     response = client.models.generate_content(
-                                        model='gemini-3.8-flash',
+                                        model='gemini-2.0-flash',
                                         contents=[normalized_img, prompt]
                                     )
                                     
                                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                                     extracted_data = json.loads(clean_text)
-                                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, img_cust_fallback)
+                                    valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, selected_day, img_cust_fallback)
                                     
                                     if valid_rows:
                                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                                        st.success(f"🎉 ပုံထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီးပါပြီ! စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                                        st.success(f"🎉 ပုံထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                                         if blocked_found:
                                             st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                                         st.rerun()
@@ -246,30 +246,37 @@ if not st.session_state.data.empty:
     df = st.session_state.data
     
     total_sales = df["Amount"].sum()
+    commission_amt = total_sales * (commission_pct / 100)
+    net_sales = total_sales - commission_amt
     total_bets = len(df)
     unique_customers = df["Customer"].nunique()
     
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("💰 စုစုပေါင်း ရောင်းရငွေ", f"{total_sales:,} MMK")
-    m2.metric("🔢 စုစုပေါင်း အကွက်ရေ", f"{total_bets:,} ကွက်")
-    m3.metric("👥 ဖောက်သည် အရေအတွက်", f"{unique_customers} ဦး")
+    m2.metric(f"💸 ကော်မရှင် ({commission_pct}%)", f"{commission_amt:,.0f} MMK")
+    m3.metric("📉 ကော်မရှင်နှုတ်ပြီး ဒိုင်ရငွေ", f"{net_sales:,.0f} MMK")
+    m4.metric("🔢 စုစုပေါင်း အကွက်ရေ", f"{total_bets:,} ကွက်")
     
     st.markdown("---")
     
-    st.subheader("👤 ဖောက်သည်အလိုက် စာရင်းချုပ်ထုတ်ရန် (Copy Statement)")
-    selected_customer = st.selectbox("ဖောက်သည် ရွေးချယ်ပါ", df["Customer"].unique())
-    if selected_customer:
-        cust_df = df[df["Customer"] == selected_customer]
-        cust_total = cust_df["Amount"].sum()
-        cust_text = f"📒 *{selected_customer}* ၏ 2D ထိုးငွေစာရင်း\n"
-        cust_text += "-" * 25 + "\n"
-        for idx, row in cust_df.iterrows():
-            cust_text += f"• {row['Number']} = {row['Amount']:,} ကျပ်\n"
-        cust_text += "-" * 25 + "\n"
-        cust_text += f"စုစုပေါင်း = {cust_total:,} ကျပ်"
+    st.subheader("📊 နေ့အလိုက် / တစ်ပတ်စာ စာရင်းချုပ်အကျဉ်း (Weekly Report Summary)")
+    day_summary = df.groupby("Day")["Amount"].sum().reset_index()
+    st.dataframe(day_summary, use_container_width=True)
+    
+    payout_amount = 0
+    if winning_number:
+        winning_matched = df[df["Number"] == str(winning_number).strip().zfill(2)]
+        winning_total_amt = winning_matched["Amount"].sum()
+        payout_amount = winning_total_amt * payout_rate
+        net_pl = net_sales - payout_amount
         
-        st.text_area("Viber / Messenger သို့ ပြန်ပို့ရန် စာသား", cust_text, height=160)
+        st.markdown(f"### 🎯 ပေါက်ဂဏန်း တိုက်စစ်ချက် ({winning_number.zfill(2)})")
+        w1, w2, w3 = st.columns(3)
+        w1.metric("ပေါက်ဂဏန်းပေါ် ထိုးငွေစုစုပေါင်း", f"{winning_total_amt:,} MMK")
+        w2.metric("ပေးရမည့် ဆုငွေ", f"{payout_amount:,} MMK")
+        w3.metric("ဒိုင် အနိုင် / အရှုံး (Net Result)", f"{net_pl:,} MMK")
 
+    st.markdown("---")
     col_left, col_right = st.columns(2)
     
     with col_left:
@@ -285,33 +292,17 @@ if not st.session_state.data.empty:
     
     c_exp, c_clr = st.columns([2, 1])
     with c_exp:
-        # CONSOLIDATED EXPORT: Group by Customer and Number so CSV sums amounts perfectly per number
-        export_df = df.groupby(["Customer", "Number"])["Amount"].sum().reset_index()
+        export_df = df.groupby(["Day", "Customer", "Number"])["Amount"].sum().reset_index()
         csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
-            label="📥 ဂဏန်းပေါင်းချုပ်ပြီး ပြည့်စုံသော CSV ဖိုင် Download ဆွဲရန်",
+            label="📥 နေ့အလိုက် ပြည့်စုံသော CSV ဖိုင် Download ဆွဲရန်",
             data=csv_data,
-            file_name=f"2D_Consolidated_Ledger_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=f"2D_Weekly_Ledger_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime='text/csv'
         )
     with c_clr:
         if st.button("🗑️ စာရင်း အစအဆုံး ရှင်းလင်းရန်"):
-            st.session_state.data = pd.DataFrame(columns=["Customer", "Number", "Amount"])
+            st.session_state.data = pd.DataFrame(columns=["Day", "Customer", "Number", "Amount"])
             st.rerun()
-            
-    if winning_number:
-        st.markdown("---")
-        st.subheader(f"🎯 ပေါက်ဂဏန်းတိုက်စစ်ခြင်း ({winning_number.zfill(2)})")
-        winners = df[df["Number"] == str(winning_number).strip().zfill(2)]
-        if not winners.empty:
-            st.success("🎉 ကံထူးရှင်များ ရှိပါသည်။")
-            st.dataframe(winners, use_container_width=True)
-            payout = winners["Amount"].sum() * payout_rate
-            profit = total_sales - payout
-            w1, w2 = st.columns(2)
-            w1.metric("ပေးရမည့် ဆုငွေ", f"{payout:,} MMK")
-            w2.metric("ဒိုင် အမြတ် / အရှုံး", f"{profit:,} MMK")
-        else:
-            st.info("ကံထူးရှင် မရှိပါ။")
 else:
     st.info("📒 ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။ အပေါ်ပါ နည်းလမ်း (၃) မျိုးမှ တစ်ခုခုဖြင့် စာရင်းစတင်သွင်းနိုင်ပါသည်။")
