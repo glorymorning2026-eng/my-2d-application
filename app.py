@@ -133,7 +133,7 @@ with tab1:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{cust_manual}'\nInput text: {smart_input_text}"
-                    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
@@ -167,7 +167,7 @@ with tab2:
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     prompt = f"{SYSTEM_RULES}\nCustomer Name: '{sms_customer}'\nMessage text:\n{sms_text_input}"
-                    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                    response = client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
                     
                     clean_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     extracted_data = json.loads(clean_text)
@@ -218,7 +218,7 @@ with tab3:
                                     prompt = f"{SYSTEM_RULES}\nExtract customer name if visible in the screenshot, otherwise use '{img_cust_fallback}'."
                                     
                                     response = client.models.generate_content(
-                                        model='gemini-2.5-flash',
+                                        model='gemini-3.8-flash',
                                         contents=[normalized_img, prompt]
                                     )
                                     
@@ -285,11 +285,11 @@ if not st.session_state.data.empty:
     
     c_exp, c_clr = st.columns([2, 1])
     with c_exp:
-        # CONSOLIDATED EXPORT: Group by Number so CSV sums amounts per number correctly
+        # CONSOLIDATED EXPORT: Group by Customer and Number so CSV sums amounts perfectly per number
         export_df = df.groupby(["Customer", "Number"])["Amount"].sum().reset_index()
         csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
-            label="📥 ဂဏန်းပေါင်းချုပ်ပြီး CSV (Excel) ဖိုင်ဖြင့် Download ဆွဲရန်",
+            label="📥 ဂဏန်းပေါင်းချုပ်ပြီး ပြည့်စုံသော CSV ဖိုင် Download ဆွဲရန်",
             data=csv_data,
             file_name=f"2D_Consolidated_Ledger_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime='text/csv'
