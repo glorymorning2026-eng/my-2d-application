@@ -8,7 +8,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from google import genai
 
-st.set_page_config(page_title="Myanmar 2D Dealer App", page_icon="📒", layout="wide")
+st.set_page_config(page_title="Myanmar 2D Dealer App", page_icon="", layout="wide")
 
 st.markdown("""
     <style>
@@ -27,26 +27,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Smart Ledger & Advanced Viber Statement Generator (Gemini 3.8+)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1> မြန်မာနှစ်လုံးထီ (2D) အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Smart Ledger, Winning Checker & Advanced Viber Statement Generator (Gemini 3.8+)</p></div>', unsafe_allow_html=True)
 
-st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
+st.sidebar.header(" ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=50000, step=5000)
 payout_rate = st.sidebar.number_input("ဆုကြေးနှုန်း (ဆ)", value=80, step=5)
 commission_pct = st.sidebar.number_input("ကော်မရှင် (%)", value=10, step=1)
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("⏰ အချိန်ပိတ်ရက် ထိန်းချုပ်မှု")
+st.sidebar.subheader(" အချိန်ပိတ်ရက် ထိန်းချုပ်မှု")
 enable_time_lock = st.sidebar.checkbox("အချိန်ပိတ်ရန် ဖွင့်မည်", value=False)
 closing_time = st.sidebar.time_input("ပိတ်မည့် အချိန်", value=datetime.strptime("12:00", "%H:%M").time())
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🚫 ပိတ်ဂဏန်းများ (Comma ခြားရန်)")
+st.sidebar.subheader(" ပိတ်ဂဏန်းများ (Comma ခြားရန်)")
 blocked_input = st.sidebar.text_input("မခံမည့် ဂဏန်းများ (ဥပမာ: 39, 88)", value="")
 blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip()]
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 AI စနစ် ဆက်တင် (Gemini 3.8+)")
+st.sidebar.subheader(" AI စနစ် ဆက်တင် (Gemini 3.8+)")
 model_choice = st.sidebar.selectbox("AI Model ရွေးချယ်ရန်", ["gemini-3.8-flash", "gemini-4-hydrogen", "gemini-2.5-flash"], index=0)
 gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ရန်", type="password", value="")
 
@@ -134,6 +134,8 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
         for col_letter, width in col_widths.items():
             ws.column_dimensions[col_letter].width = width
 
+    win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
+
     # TAB 1: စာရင်းချုပ်အကျဉ်း
     ws_sum = wb.active
     ws_sum.title = "စာရင်းချုပ်အကျဉ်း"
@@ -146,7 +148,6 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     comm_amount = total_sales * (commission_pct / 100.0)
     net_sales = total_sales - comm_amount
     
-    win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
     win_bet_total = float(df[df["Number"] == win_num_clean]["Amount"].sum()) if win_num_clean else 0.0
     payout_total = win_bet_total * payout_rate
     net_pl = net_sales - payout_total
@@ -389,40 +390,40 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     wb.save(output)
     return output.getvalue()
 
-st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ")
+st.subheader(" စာရင်းသွင်းရန် နည်းလမ်းများ")
 
 is_closed = False
 if enable_time_lock:
     current_time = datetime.now().time()
     if current_time >= closing_time:
         is_closed = True
-        st.error(f"⚠️ သတိပေးချက် - စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်သွားပြီဖြစ်၍ စာရင်းအသစ် လက်မခံတော့ပါ။")
+        st.error(f" သတိပေးချက် - စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်သွားပြီဖြစ်၍ စာရင်းအသစ် လက်မခံတော့ပါ။")
 
 col_d1, col_d2 = st.columns(2)
 with col_d1:
-    entry_date = st.date_input("📆 စာရင်းသွင်းမည့် ရက်စွဲ (Date)", value=datetime.now().date())
+    entry_date = st.date_input(" စာရင်းသွင်းမည့် ရက်စွဲ (Date)", value=datetime.now().date())
 with col_d2:
     default_day_idx = min(entry_date.weekday(), 5)
     day_options = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "WEEKEND"]
-    selected_day = st.selectbox("📅 စာရင်းသွင်းမည့် နေ့ (Day)", day_options, index=default_day_idx)
+    selected_day = st.selectbox(" စာရင်းသွင်းမည့် နေ့ (Day)", day_options, index=default_day_idx)
 
 entry_date_str = entry_date.strftime("%Y-%m-%d")
 
 tab1, tab2, tab3 = st.tabs([
-    "✍️ ဂဏန်းနှင့်ငွေ ရောနှောရိုက်ထည့်ရန် (Smart Input)", 
-    "💬 ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်", 
-    "📸 စကရင်ရှော့ ပုံတင်၍ AI ဖတ်ရန်"
+    " ဂဏန်းနှင့်ငွေ ရောနှောရိုက်ထည့်ရန် (Smart Input)", 
+    " ဖောက်သည်ပို့သော စာသား (SMS) ဖြင့် AI ဖတ်ရန်", 
+    " စကရင်ရှော့ ပုံတင်၍ AI ဖတ်ရန်"
 ])
 
 with tab1:
-    st.markdown("#### 💡 ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
+    st.markdown("####  ထိုးမည့်ဂဏန်းနှင့် ငွေပမာဏကို တစ်ခါတည်း ရောနှောရိုက်ထည့်ပါ")
     col1, col2 = st.columns([1, 2])
     with col1:
-        cust_manual = st.text_input("ဖောက်သည် အမည်", key="c_man", placeholder="ဥပမာ - Hnin")
+        cust_manual = st.text_input("ဖောက်သည် အမည်", key="c_man", placeholder="ဥပမာ - Sandar")
     with col2:
         smart_input_text = st.text_input("ထိုးသည့် 2D ဂဏန်းနှင့် ငွေပမာဏ (ရောနှောလျက်)", key="s_input", placeholder="12@1000 10@1000 48_3000")
 
-    if st.button("➕ အလိုအလျောက် တွက်ချက်၍ စာရင်းသွင်းမည်", type="primary"):
+    if st.button(" အလိုအလျောက် တွက်ချက်၍ စာရင်းသွင်းမည်", type="primary"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not cust_manual or not smart_input_text:
@@ -442,9 +443,9 @@ with tab1:
                     
                     if valid_rows:
                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                        st.success(f"🎉 စာရင်းသွင်းပြီးပါပြီ! ({selected_day} - {cust_manual}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                        st.success(f" စာရင်းသွင်းပြီးပါပြီ! ({selected_day} - {cust_manual}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                         if blocked_found:
-                            st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
+                            st.warning(f" ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                         st.rerun()
                     else:
                         st.warning("သတ်မှတ်ချက်နှင့် ကိုက်ညီသော စာရင်းမတွေ့ပါ။")
@@ -452,11 +453,11 @@ with tab1:
                     st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
 
 with tab2:
-    st.markdown("#### 💬 ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ကူးထည့်ပါ")
+    st.markdown("####  ဖောက်သည်ပေးပို့ထားသော စာသား (Viber / Messenger SMS) ကို ကူးထည့်ပါ")
     sms_customer = st.text_input("ဖောက်သည် အမည် (စာသားအတွက်)", key="sms_cust", placeholder="ဥပမာ - မောင်မောင်")
     sms_text_input = st.text_area("ဖောက်သည် ပို့လိုက်သော စာသားမက်ဆေ့ဂျ် အပြည့်အစုံကို ကူးထည့်ပါ (Paste)", height=130)
     
-    if st.button("🤖 စာသားကို AI ဖြင့် ဖြန့်ကျက်ဖတ်မည်", type="primary"):
+    if st.button(" စာသားကို AI ဖြင့် ဖြန့်ကျက်ဖတ်မည်", type="primary"):
         if is_closed:
             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
         elif not gemini_api_key:
@@ -476,9 +477,9 @@ with tab2:
                     
                     if valid_rows:
                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                        st.success(f"🎉 စာသားဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                        st.success(f" စာသားဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                         if blocked_found:
-                            st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
+                            st.warning(f" ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                         st.rerun()
                     else:
                         st.warning("သတ်မှတ်ချက်နှင့် ကိုက်ညီသော စာရင်းမတွေ့ပါ။")
@@ -486,13 +487,13 @@ with tab2:
                     st.error(f"စာရင်းဖတ်ရာတွင် အမှားအယွင်း ရှိသွားပါသည်: {e}")
 
 with tab3:
-    st.markdown("#### 📸 စကရင်ရှော့ (သို့) ဖုန်းဓာတ်ပုံတင်၍ စာရင်းဖတ်ရန်")
+    st.markdown("####  စကရင်ရှော့ (သို့) ဖုန်းဓာတ်ပုံတင်၍ စာရင်းဖတ်ရန်")
     img_cust_fallback = st.text_input("ဖောက်သည် အမည် (ပုံထဲတွင် အမည်မပါပါက ထည့်ရန်)", value="Screenshot Customer", key="img_cust")
     uploaded_file = st.file_uploader("ဖောက်သည် ပို့ထားသော စကရင်ရှော့ ပုံရွေးချယ်ပါ", type=["png", "jpg", "jpeg"])
     
     if uploaded_file is not None:
         if uploaded_file.size > 8 * 1024 * 1024:
-            st.error("⚠️ ဖိုင်အရွယ်အစား 8MB ထက် ကြီးနေပါသည်။ ပိုမိုသေးငယ်သော ပုံကို ပြန်လည်ရွေးချယ်ပေးပါ။")
+            st.error(" ဖိုင်အရွယ်အစား 8MB ထက် ကြီးနေပါသည်။ ပိုမိုသေးငယ်သော ပုံကို ပြန်လည်ရွေးချယ်ပေးပါ။")
         else:
             try:
                 normalized_img = normalize_image(uploaded_file)
@@ -501,11 +502,11 @@ with tab3:
                     st.image(normalized_img, caption="စစ်ဆေးပြီး ပုံအကြိုကြည့်ရှုခြင်း (Ready)", use_container_width=True)
                 with col_meta:
                     st.markdown("**ဖိုင်အချက်အလက် (Metadata):**")
-                    st.write(f"• ဖိုင်အမည်: `{uploaded_file.name}`")
-                    st.write(f"• ချိန်ညှိပြီး အရွယ်အစား: `{normalized_img.size[0]} x {normalized_img.size[1]} px`")
-                    st.write(f"• သတ်မှတ်ရက်စွဲ: `{entry_date_str} ({selected_day})`")
+                    st.write(f" ဖိုင်အမည်: `{uploaded_file.name}`")
+                    st.write(f" ချိန်ညှိပြီး အရွယ်အစား: `{normalized_img.size[0]} x {normalized_img.size[1]} px`")
+                    st.write(f" သတ်မှတ်ရက်စွဲ: `{entry_date_str} ({selected_day})`")
                     
-                    if st.button("🤖 ဓာတ်ပုံထဲမှ စာရင်းများကို AI ဖြင့် ဖတ်မည်", type="primary"):
+                    if st.button(" ဓာတ်ပုံထဲမှ စာရင်းများကို AI ဖြင့် ဖတ်မည်", type="primary"):
                         if is_closed:
                             st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပြီဖြစ်ပါသည်။")
                         elif not gemini_api_key:
@@ -527,9 +528,9 @@ with tab3:
                                     
                                     if valid_rows:
                                         st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-                                        st.success(f"🎉 ပုံထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                                        st.success(f" ပုံထဲမှ စာရင်းများကို အောင်မြင်စွာ ဖတ်ရှုပြီးပါပြီ! ({selected_day}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
                                         if blocked_found:
-                                            st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
+                                            st.warning(f" ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
                                         st.rerun()
                                     else:
                                         st.warning("ပုံထဲတွင် သတ်မှတ်ချက်နှင့် ကိုက်ညီသော စာရင်းမတွေ့ပါ။ ပုံကြည်လင်မှု ရှိ/မရှိ ပြန်စစ်ပေးပါ။")
@@ -538,7 +539,7 @@ with tab3:
             except Exception as img_err:
                 st.error(f"ပုံဖိုင် ဖွင့်ရာတွင် အမှားရှိနေပါသည်: {img_err}")
     else:
-        st.caption("ပုံမတက်သေးပါ — အပေါ်ပါခလုတ်မှ စကရင်ရှော့ပုံကို ရွေးချယ်နိုင်ပါသည်။")
+        st.caption("ပုံမတက်သေးပါ  အပေါ်ပါခလုတ်မှ စကရင်ရှော့ပုံကို ရွေးချယ်နိုင်ပါသည်။")
 
 st.markdown("---")
 if not st.session_state.data.empty:
@@ -549,49 +550,64 @@ if not st.session_state.data.empty:
     net_sales = total_sales - commission_amt
     total_bets = len(df)
     
+    win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
     payout_amount = 0
     winning_total_amt = 0
     if winning_number:
-        winning_matched = df[df["Number"] == str(winning_number).strip().zfill(2)]
+        winning_matched = df[df["Number"] == win_num_clean]
         winning_total_amt = winning_matched["Amount"].sum()
         payout_amount = winning_total_amt * payout_rate
     net_pl = net_sales - payout_amount
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("💰 စုစုပေါင်း ရောင်းရငွေ", f"{total_sales:,} MMK")
-    m2.metric(f"💸 ကော်မရှင် ({commission_pct}%)", f"{commission_amt:,.0f} MMK")
-    m3.metric("📉 ကော်မရှင်နှုတ်ပြီး ဒိုင်ရငွေ", f"{net_sales:,.0f} MMK")
-    m4.metric("📊 အသားတင် အနိုင် / အရှုံး", f"{net_pl:,.0f} MMK")
+    m1.metric(" စုစုပေါင်း ရောင်းရငွေ", f"{total_sales:,.0f} MMK")
+    m2.metric(f" ကော်မရှင် ({commission_pct}%)", f"{commission_amt:,.0f} MMK")
+    m3.metric(" ကော်မရှင်နှုတ်ပြီး ဒိုင်ရငွေ", f"{net_sales:,.0f} MMK")
+    m4.metric(" အသားတင် အနိုင် / အရှုံး", f"{net_pl:,.0f} MMK")
     
     st.markdown("---")
     
-    # --- SECTION: နေ့အလိုက် / တစ်ပတ်စာ စာရင်းချုပ် & Viber Generator ---
-    st.subheader("📊 နေ့အလိုက် / တစ်ပတ်စာ စာရင်းချုပ်နှင့် ဖောက်သည် Viber Statement Generator")
+    # --- SECTION: Winning Checker & Statement Generator ---
+    st.subheader(" ပေါက်ဂဏန်း ကံထူးသူများ စာရင်း တိုက်စစ်ခြင်း")
+    if winning_number:
+        if not winning_matched.empty:
+            st.success(f" ပေါက်ဂဏန်း ({win_num_clean}) အတွက် ကံထူးရှင်များ ရှိပါသည်။")
+            st.dataframe(winning_matched, use_container_width=True)
+            w_col1, w_col2 = st.columns(2)
+            w_col1.metric("ပေးရမည့် ဆုကြေးငွေစုစုပေါင်း", f"{payout_amount:,.0f} MMK")
+            w_col2.metric("ဒိုင် အမြတ် / အရှုံး (Net P/L)", f"{net_pl:,.0f} MMK")
+        else:
+            st.info(f"ပေါက်ဂဏန်း ({win_num_clean}) ထိုးထားသူ မရှိပါ။ ဒိုင်အမြတ် = {net_sales:,.0f} MMK")
+    else:
+        st.info(" ဘယ်ဘက် Sidebar တွင် 'ထွက်မည့် ပေါက်ဂဏန်း' ထည့်သွင်းပေးခြင်းဖြင့် ကံထူးရှင်စာရင်းနှင့် ဆုကြေးများကို အလိုအလျောက် တိုက်စစ်နိုင်ပါသည်။")
+
+    st.markdown("---")
+    st.subheader(" နေ့အလိုက် / တစ်ပတ်စာ စာရင်းချုပ်နှင့် ဖောက်သည် Viber Statement Generator")
     
     col_rep1, col_rep2 = st.columns([1, 1])
     
     with col_rep1:
-        st.markdown("##### 📅 တစ်နေ့တာ / တစ်ပတ်စာ စုစုပေါင်း ရှင်းတမ်း")
+        st.markdown("#####  တစ်နေ့တာ / တစ်ပတ်စာ စုစုပေါင်း ရှင်းတမ်း")
         day_summary = df.groupby(["Date", "Day"])["Amount"].sum().reset_index()
         st.dataframe(day_summary, use_container_width=True)
         
-        report_lines = ["📒 *မြန်မာ 2D စာရင်းချုပ်အစီရင်ခံစာ*", "=" * 28]
+        report_lines = [" *မြန်မာ 2D စာရင်းချုပ်အစီရင်ခံစာ*", "=" * 28]
         for r in day_summary.itertuples():
-            report_lines.append(f"📅 {r.Day} ({r.Date}) : {r.Amount:,.0f} ကျပ်")
+            report_lines.append(f" {r.Day} ({r.Date}) : {r.Amount:,.0f} ကျပ်")
         report_lines.append("-" * 28)
-        report_lines.append(f"💰 စုစုပေါင်းရောင်းရငွေ = {total_sales:,.0f} ကျပ်")
-        report_lines.append(f"💸 ကော်မရှင် ({commission_pct}%) = -{commission_amt:,.0f} ကျပ်")
-        report_lines.append(f"✅ ဒိုင်ရငွေ (Net Sales) = {net_sales:,.0f} ကျပ်")
+        report_lines.append(f" စုစုပေါင်းရောင်းရငွေ = {total_sales:,.0f} ကျပ်")
+        report_lines.append(f" ကော်မရှင် ({commission_pct}%) = -{commission_amt:,.0f} ကျပ်")
+        report_lines.append(f" ဒိုင်ရငွေ (Net Sales) = {net_sales:,.0f} ကျပ်")
         if winning_number:
-            report_lines.append(f"🎯 ပေါက်ဂဏန်း ({str(winning_number).strip().zfill(2)}) တန်ဖိုး = {winning_total_amt:,.0f} ကျပ်")
-            report_lines.append(f"🏆 ပေးရမည့်ဆုငွေ ({payout_rate}ဆ) = -{payout_amount:,.0f} ကျပ်")
+            report_lines.append(f" ပေါက်ဂဏန်း ({win_num_clean}) တန်ဖိုး = {winning_total_amt:,.0f} ကျပ်")
+            report_lines.append(f" ပေးရမည့်ဆုငွေ ({payout_rate}ဆ) = -{payout_amount:,.0f} ကျပ်")
         status_label = "အမြတ် (+)" if net_pl >= 0 else "အရှုံး (-)"
-        report_lines.append(f"📊 အသားတင် {status_label} = {net_pl:,.0f} ကျပ်")
+        report_lines.append(f" အသားတင် {status_label} = {net_pl:,.0f} ကျပ်")
         
         st.text_area("ဒိုင်ချုပ် Viber Text (Copy ယူရန်)", "\n".join(report_lines), height=140)
 
     with col_rep2:
-        st.markdown("##### 👤 ဖောက်သည်တစ်ဦးချင်းစီအတွက် Viber Statement ထုတ်ရန်")
+        st.markdown("#####  ဖောက်သည်တစ်ဦးချင်းစီအတွက် Viber Statement ထုတ်ရန်")
         unique_customers = df["Customer"].unique()
         selected_cust_stmt = st.selectbox("ဖောက်သည် ရွေးချယ်ပါ", unique_customers)
         
@@ -609,17 +625,17 @@ if not st.session_state.data.empty:
             c_balance = c_net - c_win_amt
 
             cust_viber_lines = [
-                f"📒 *{selected_cust_stmt}* ၏ 2D ထိုးငွေနှင့် ရှင်းတမ်း",
+                f" *{selected_cust_stmt}* ၏ 2D ထိုးငွေနှင့် ရှင်းတမ်း",
                 "-" * 25
             ]
             for idx, row in c_df.iterrows():
-                cust_viber_lines.append(f"• {row['Number']} = {row['Amount']:,} ကျပ် ({row['Day']})")
+                cust_viber_lines.append(f" {row['Number']} = {row['Amount']:,} ကျပ် ({row['Day']})")
             cust_viber_lines.append("-" * 25)
             cust_viber_lines.append(f"စုစုပေါင်းထိုးကြေး = {c_total:,.0f} ကျပ်")
             cust_viber_lines.append(f"ကော်မရှင် ({commission_pct}%) = -{c_comm:,.0f} ကျပ်")
             cust_viber_lines.append(f"ပေးချေရန် Net = {c_net:,.0f} ကျပ်")
             if winning_number:
-                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({winning_number.zfill(2)}) = +{c_win_amt:,.0f} ကျပ်")
+                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_num_clean}) = +{c_win_amt:,.0f} ကျပ်")
                 bal_label = "ပေးရန် (+) / ရရန် (-)" if c_balance >= 0 else "ရရန်"
                 cust_viber_lines.append(f"ရှင်းတမ်းစုစုပေါင်း ({bal_label}) = {c_balance:,.0f} ကျပ်")
 
@@ -629,14 +645,14 @@ if not st.session_state.data.empty:
     col_left, col_right = st.columns(2)
     
     with col_left:
-        st.subheader("📊 ဂဏန်းအလိုက် စုစုပေါင်းနှင့် ကန့်သတ်ချက် (Limit Control)")
+        st.subheader(" ဂဏန်းအလိုက် စုစုပေါင်းနှင့် ကန့်သတ်ချက် (Limit Control)")
         grouped = df.groupby("Number")["Amount"].sum().reset_index().sort_values(by="Amount", ascending=False)
         grouped["Allowed"] = grouped["Amount"].apply(lambda x: min(x, max_limit))
         grouped["Excess"] = grouped["Amount"] - grouped["Allowed"]
         st.dataframe(grouped, use_container_width=True)
         
     with col_right:
-        st.subheader("📋 ဖောက်သည်နှင့် ဂဏန်းအလိုက် ပေါင်းချုပ်စာရင်း")
+        st.subheader(" ဖောက်သည်နှင့် ဂဏန်းအလိုက် ပေါင်းချုပ်စာရင်း")
         consolidated_view = df.groupby(["Date", "Day", "Customer", "Number"])["Amount"].sum().reset_index()
         st.dataframe(consolidated_view, use_container_width=True)
     
@@ -645,15 +661,15 @@ if not st.session_state.data.empty:
     with c_exp:
         excel_bytes = generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_limit)
         st.download_button(
-            label="📥 ဖောက်သည်ရှင်းတမ်း Tab အပါအဝင် Excel ဖိုင် Download ဆွဲရန်",
+            label=" ဖောက်သည်ရှင်းတမ်း Tab အပါအဝင် Excel ဖိုင် Download ဆွဲရန်",
             data=excel_bytes,
             file_name=f"2D_Complete_Report_With_Customer_Statement_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary"
         )
     with c_clr:
-        if st.button("🗑️ စာရင်း အစအဆုံး ရှင်းလင်းရန်"):
+        if st.button(" စာရင်း အစအဆုံး ရှင်းလင်းရန်"):
             st.session_state.data = pd.DataFrame(columns=["Date", "Day", "Customer", "Number", "Amount"])
             st.rerun()
 else:
-    st.info("📒 ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။ အပေါ်ပါ နည်းလမ်း (၃) မျိုးမှ တစ်ခုခုဖြင့် စာရင်းစတင်သွင်းနိုင်ပါသည်။")
+    st.info(" ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။ အပေါ်ပါ နည်းလမ်း (၃) မျိုးမှ တစ်ခုခုဖြင့် စာရင်းစတင်သွင်းနိုင်ပါသည်။")
