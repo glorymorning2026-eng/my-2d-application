@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Detailed Message Breakdown & Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Full Rule Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=50000, step=5000)
@@ -218,11 +218,9 @@ def process_and_add_bets(extracted_data, entry_date_str, selected_day, default_c
     invalid_amt_found = 0
     total_added_amount = 0
     
-    # Determine next BatchID for this customer
     existing_batches = st.session_state.data[st.session_state.data["Customer"] == default_customer]["BatchID"]
     next_batch_num = 1
     if not existing_batches.empty:
-        # Extract numbers from BatchID like "မိုးမိုး(1)"
         nums = []
         for b in existing_batches.unique():
             m = re.search(r'\((\d+)\)', str(b))
@@ -282,7 +280,6 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
 
     win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
 
-    # TAB 1: စာရင်းချုပ်အကျဉ်း
     ws_sum = wb.active
     ws_sum.title = "စာရင်းချုပ်အကျဉ်း"
     ws_sum["A1"] = "မြန်မာနှစ်လုံးထီ (2D) ငွေစာရင်းချုပ် အစီရင်ခံစာ"
@@ -571,15 +568,16 @@ if not st.session_state.data.empty:
             
             cust_final_balance = cust_net_pay - cust_win_amt
 
-            # Construct formula string like မိုးမိုး(1)+မိုးမိုး(2) = Total
-            formula_parts = [f"{b[0]}" for b in batch_totals_for_sum]
+            # Strict Custom Formula Format: [သိမ့်(1)=သိမ့်(1)၏Total] + [သိမ့်(2)=သိမ့်(2)၏Total] = *(Total ကျပ်)*
+            formula_items = [f"[{b[0]}={b[1]:,.0f} ကျပ်]" for b in batch_totals_for_sum]
+            formula_string = " + ".join(formula_items) + f" = *({cust_overall_total:,.0f} ကျပ်)*"
+
             cust_viber_lines.append("=" * 28)
-            cust_viber_lines.append(f"🧮 *ပေါင်းချုပ် ფორမြူລາ*:")
-            cust_viber_lines.append(" + ".join(formula_parts) + f" = *{cust_overall_total:,.0f} ကျပ်*")
-            cust_viber_lines.append(f"💸 ကော်မရှင် ({commission_pct}%) = -{cust_comm:,.0f} ကျပ်")
-            cust_viber_lines.append(f"✅ ပေးချေရန် Net = {cust_net_pay:,.0f} ကျပ်")
+            cust_viber_lines.append(formula_string)
+            cust_viber_lines.append(f"ကော်မရှင် ({commission_pct}%) = -{cust_comm:,.0f} ကျပ်")
+            cust_viber_lines.append(f"ပေးချေရန် Net = {cust_net_pay:,.0f} ကျပ်")
             if winning_number:
-                cust_viber_lines.append(f"🎯 ပေါက်ဂဏန်းဆုကြေး ({win_num_clean}) = +{cust_win_amt:,.0f} ကျပ်")
+                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_num_clean}) = +{cust_win_amt:,.0f} ကျပ်")
                 bal_label = "ပေးရန် (+) / ရရန် (-)" if cust_final_balance >= 0 else "ရရန်"
                 cust_viber_lines.append(f"ရှင်းတမ်းစုစုပေါင်း ({bal_label}) = {cust_final_balance:,.0f} ကျပ်")
 
