@@ -1,4 +1,5 @@
-streamlit
-pandas
-google-genai
-Pillow
+streamlit>=1.36.0
+pandas>=2.0.0
+Pillow>=10.0.0
+# Optional: screenshot OCR support
+pytesseract>=0.3.10
