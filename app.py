@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Advanced Strict Regex Parser & Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Advanced Precision Regex Parser & Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=500000, step=50000)
@@ -98,7 +98,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": p, "Amount": amt})
             continue
 
-        # 5. Break / B / bk (ဘရိတ်)
+        # 5. Break / B / bk (ဘရိတ်) - e.g. 4 B 1500
         break_match = re.search(r'(\d)\s*(ဘရိတ်|B|bk)', line, re.IGNORECASE)
         if break_match:
             b_val = int(break_match.group(1))
@@ -183,69 +183,42 @@ def parse_bets_locally(text):
             rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 11. Multi-dot/dash number with .r. or .R. format (e.g., 85.3000.r.500 or 45.43.40.r.250)
-        dot_r_match = re.search(r'^([\d\.\-\/\,\s]+)\.([Rrရ@&အာ])\.(\d+)$', line)
-        if dot_r_match:
-            nums_part = dot_r_match.group(1)
-            rev_amt = int(dot_r_match.group(3))
-            
-            # Extract numbers and any embedded amount
-            parts = nums_part.split('.')
-            real_nums = []
-            base_amt = 1000
-            for p in parts:
-                if p.isdigit():
-                    if len(p) <= 2:
-                        real_nums.append(p.zfill(2))
-                    else:
-                        base_amt = int(p)
-            
-            for n1 in real_nums:
-                rows.append({"Number": n1, "Amount": base_amt})
+        # 11. Multi-dot/dash number with .r. or R format (e.g., 67.68.78.49.30.23R500 or 64.69.74.79.84.89.R1000)
+        match_multi_r = re.search(r'^([\d\.\-\/\,\s]+?)\.?\s*[Rr]\s*(\d+)$', line)
+        if match_multi_r:
+            nums_part = match_multi_r.group(1)
+            amt = int(match_multi_r.group(2))
+            raw_nums = re.findall(r'\d{1,2}', nums_part)
+            valid_nums = [n.zfill(2) for n in raw_nums if len(n) <= 2]
+            for n1 in valid_nums:
+                rows.append({"Number": n1, "Amount": amt})
                 n2 = n1[::-1]
-                rows.append({"Number": n2, "Amount": rev_amt})
+                rows.append({"Number": n2, "Amount": amt})
             continue
 
-        # 12. Complex slash/dash list with amounts and R (e.g., 51/52/58-50000r10000)
-        complex_match = re.search(r'^([\d\.\-\/\,\s]+)[\-\=](\d+)([Rrရ@&အာ]?)(\d*)$', line)
-        if complex_match:
-            nums_part = complex_match.group(1)
-            base_amt = int(complex_match.group(2))
-            has_r = bool(complex_match.group(3))
-            rev_amt = int(complex_match.group(4)) if complex_match.group(4) else 0
-            
+        # 12. Multi-number with dot/slash/dash and trailing amount (no R) (e.g., 66.77.88.1000, 22.77.2500)
+        match_multi_amt = re.search(r'^([\d\.\-\/\,\s]+?)[\.\-\/\,\s](\d{3,6})$', line)
+        if match_multi_amt:
+            nums_part = match_multi_amt.group(1)
+            amt = int(match_multi_amt.group(2))
             raw_nums = re.findall(r'\d{1,2}', nums_part)
-            for n_str in raw_nums:
-                n1 = n_str.zfill(2)
-                rows.append({"Number": n1, "Amount": base_amt})
-                if has_r:
-                    n2 = n1[::-1]
-                    r_val = rev_amt if rev_amt > 0 else base_amt
-                    rows.append({"Number": n2, "Amount": r_val})
+            valid_nums = [n.zfill(2) for n in raw_nums if len(n) <= 2]
+            for n1 in valid_nums:
+                rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 13. Single Reverse / R (e.g., 45 R 10000)
-        rev_match = re.search(r'(\d{1,2})\s*([Rrရ@&အာ])\s*(\d+)', line)
-        if rev_match:
-            num1 = rev_match.group(1).zfill(2)
-            amt = int(rev_match.group(3))
-            num2 = num1[::-1]
-            rows.append({"Number": num1, "Amount": amt})
-            if num1 != num2:
-                rows.append({"Number": num2, "Amount": amt})
-            continue
-            
-        # 14. Multi-number dot/slash/dash list with trailing amount (e.g., 55.66.44.22.11.1000)
-        multi_pairs = re.search(r'^([\d\.\-\/\,\s]+)[\.\-\/\,\s](\d{3,6})$', line)
-        if multi_pairs:
-            nums_part = multi_pairs.group(1)
-            amt = int(multi_pairs.group(2))
-            raw_nums = re.findall(r'\d{1,2}', nums_part)
-            for n_str in raw_nums:
-                rows.append({"Number": n_str.zfill(2), "Amount": amt})
+        # 13. Single Reverse / R (e.g., 20R2500)
+        single_r = re.search(r'^(\d{1,2})\s*[Rr]\s*(\d+)$', line)
+        if single_r:
+            n1 = single_r.group(1).zfill(2)
+            amt = int(single_r.group(2))
+            rows.append({"Number": n1, "Amount": amt})
+            n2 = n1[::-1]
+            if n1 != n2:
+                rows.append({"Number": n2, "Amount": amt})
             continue
 
-        # 15. Single number standalone with amount (e.g., 44.500 or 66.2000)
+        # 14. Single number with amount
         single_amt = re.search(r'^(\d{1,2})[\.\-\s](\d{3,6})$', line)
         if single_amt:
             n1 = single_amt.group(1).zfill(2)
@@ -253,7 +226,7 @@ def parse_bets_locally(text):
             rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 16. Direct pairs with separator
+        # 15. Direct pairs with separator fallback
         pairs = re.findall(r'(\d{1,2})\s*[\-\=\/\_\.\s]\s*(\d+)', line)
         if pairs:
             for num_str, amt_str in pairs:
@@ -496,9 +469,9 @@ entry_date_str = entry_date.strftime("%Y-%m-%d")
 
 col1, col2 = st.columns([1, 2])
 with col1:
-    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - တံခွန်တိုင်")
+    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မကြီးမိုးမိုး")
 with col2:
-    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="85.3000.r.500\n20@3000\n89_3000@2000", height=130)
+    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="67.68.78.49.30.23R500\n66.77.88.1000\n4 B 1500", height=130)
 
 if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     if is_closed:
