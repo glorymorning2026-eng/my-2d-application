@@ -64,7 +64,6 @@ for k, v in [
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Flash messages (survive rerun)
 if st.session_state.flash_success:
     st.success(st.session_state.flash_success)
     st.session_state.flash_success = None
@@ -82,165 +81,30 @@ def add_number(rows, number, amount, is_default=False):
         return True
     return False
 
-
-def _last_amount(line, default=1000):
-    m = re.search(r"(\d[\d,]*)(?:tt)?\s*$", line, re.IGNORECASE)
-    return int(m.group(1).replace(",", "")) if m else default
-
-
-def extract_numbers(text):
-    return re.findall(r"\d{1,2}", text)
-
+def get_amount(text):
+    """Extracts the last number in a string as the amount."""
+    matches = re.findall(r"(\d+(?:,\d+)*)(?:tt)?", text, re.IGNORECASE)
+    if matches:
+        return int(matches[-1].replace(",", ""))
+    return 1000
 
 def _bk_for_digit(digit):
     d = int(digit)
     return [f"{i:02d}" for i in range(100) if (i // 10 + i % 10) % 10 == d]
 
-
 def _pat_for_digit(digit):
     return [f"{i:02d}" for i in range(100) if digit in f"{i:02d}"]
 
 # =========================================================
-# SEGMENT PARSER (recursive, handles / and space splits)
+# LINE PARSER
 # =========================================================
-def parse_segment(seg, default_bk=None, depth=0):
-    """Parse one segment. Returns (rows, warns, matched)."""
-    rows, warns = [], []
-    seg = seg.strip().strip("*/").strip()
-    if not seg or depth > 6:
-        return rows, warns, False
+def parse_line(line):
+    rows = []
+    warns = []
 
-    # BK
-    bk = re.fullmatch(r"(\d)\s*(bk|ဘရိတ်|B)(?![a-zA-Z])\s*(\d+)?(?:tt)?", seg, re.I)
-    if bk:
-        amt = int(bk.group(3)) if bk.group(3) else (default_bk if default_bk else 1000)
-        for n in _bk_for_digit(bk.group(1)):
-            add_number(rows, n, amt)
-        return rows, warns, True
-
-    # ပါတ်
-    pat = re.fullmatch(r"(\d)\s*(ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ူး)\s*(\d+)?(?:tt)?", seg)
-    if pat:
-        amt = int(pat.group(3)) if pat.group(3) else 1000
-        for n in _pat_for_digit(pat.group(1)):
-            add_number(rows, n, amt)
-        return rows, warns, True
-
-    # ထိပ်
-    th = re.fullmatch(r"(\d)\s*(ထိပ်စီး|ထိပ်)\s*(\d+)?(?:tt)?", seg)
-    if th:
-        amt = int(th.group(3)) if th.group(3) else 1000
-        for i in range(10):
-            add_number(rows, f"{th.group(1)}{i}", amt)
-        return rows, warns, True
-
-    # ပိတ်
-    pt = re.fullmatch(r"(\d)\s*(နောက်ပိတ်|ပိတ်)\s*(\d+)?(?:tt)?", seg)
-    if pt:
-        amt = int(pt.group(3)) if pt.group(3) else 1000
-        for i in range(10):
-            add_number(rows, f"{i}{pt.group(1)}", amt)
-        return rows, warns, True
-
-    # num=amount (full)
-    eq = re.fullmatch(r"(\d{1,2})\s*=\s*(\d{3,6})", seg)
-    if eq:
-        add_number(rows, eq.group(1), int(eq.group(2)))
-        return rows, warns, True
-
-    # num*amount (full)
-    st_ = re.fullmatch(r"(\d{1,2})\s*\*\s*(\d{3,6})", seg)
-    if st_:
-        add_number(rows, st_.group(1), int(st_.group(2)))
-        return rows, warns, True
-
-    # numRamount
-    r = re.fullmatch(r"(\d{1,2})\s*[Rr]\s*(\d+)", seg)
-    if r:
-        n, amt = r.group(1).zfill(2), int(r.group(2))
-        add_number(rows, n, amt)
-        if n != n[::-1]:
-            add_number(rows, n[::-1], amt)
-        return rows, warns, True
-
-    # num=amount + rest (greedy amount → correct)
-    pm = re.fullmatch(r"(\d{1,2})\s*=\s*(\d{3,6})(.+)", seg)
-    if pm:
-        add_number(rows, pm.group(1), int(pm.group(2)))
-        r2, w2, _ = parse_segment(pm.group(3), default_bk, depth + 1)
-        rows.extend(r2)
-        warns.extend(w2)
-        return rows, warns, True
-
-    # concatenated num+amount
-    if re.fullmatch(r"\d{5,8}", seg):
-        num, amt = seg[:2], int(seg[2:])
-        if 100 <= amt <= 500000:
-            add_number(rows, num, amt)
-            warns.append(f"Ambiguous '{seg}' → {num}={amt}")
-            return rows, warns, True
-
-    # pure 2D
-    if re.fullmatch(r"\d{1,2}", seg):
-        add_number(rows, seg, 1000, is_default=True)
-        return rows, warns, True
-
-    # Split by / or whitespace (recursive)
-    if "/" in seg or " " in seg:
-        parts = [p.strip() for p in re.split(r"[/\s]+", seg) if p.strip()]
-        if len(parts) > 1:
-            for part in parts:
-                r3, w3, m3 = parse_segment(part, default_bk, depth + 1)
-                if m3:
-                    rows.extend(r3)
-                    warns.extend(w3)
-                else:
-                    warns.append(f"Unrecognized: '{part}'")
-            if rows:
-                return rows, warns, True
-
-    return rows, warns, False
-
-# =========================================================
-# LINE PARSERS
-# =========================================================
-def is_complex_line(line):
-    if "/" not in line:
-        return False
-    segs = [s.strip() for s in line.split("/") if s.strip()]
-    if len(segs) <= 1:
-        return False
-    if all(re.fullmatch(r"\d{1,2}", s) for s in segs):
-        return False
-    return True
-
-
-def parse_complex_line(line):
-    segs = [s.strip() for s in line.split("/") if s.strip()]
-    bk_amts = []
-    for s in segs:
-        m = re.fullmatch(r"\d\s*(bk|ဘရိတ်|B)\s*(\d+)", s, re.I)
-        if m:
-            bk_amts.append(int(m.group(2)))
-    default_bk = bk_amts[0] if bk_amts else None
-    rows, warns = [], []
-    if len(set(bk_amts)) > 1:
-        warns.append(f"Multiple BK amounts {bk_amts}, using {default_bk} as default")
-    for s in segs:
-        r, w, matched = parse_segment(s, default_bk)
-        if not matched:
-            warns.append(f"Unrecognized segment: '{s}'")
-        rows.extend(r)
-        warns.extend(w)
-    return rows, warns
-
-
-def parse_single_line(line):
-    rows, warns = [], []
-
-    # Whole-line keyword groups
+    # 1. ညီအကို
     if re.search(r"ညီအကို|ညီကို", line):
-        amt = _last_amount(line, 1000)
+        amt = get_amount(line)
         pairs = ["01", "12", "23", "34", "45", "56", "67", "78", "89", "90"]
         added = set()
         for n in pairs:
@@ -250,29 +114,32 @@ def parse_single_line(line):
                     add_number(rows, item, amt)
         return rows, warns
 
-    if re.search(r"အပူ|ပူး", line) and "ခွေ" not in line:
-        amt = _last_amount(line, 1000)
+    # 2. အပူး / ပူး
+    if re.search(r"အပူ|ပူး", line) and not re.search(r"ခွေ", line):
+        amt = get_amount(line)
         for i in range(10):
             add_number(rows, f"{i}{i}", amt)
         return rows, warns
 
+    # 3. နက္ခတ်
     if "နက္ခတ်" in line:
-        amt = _last_amount(line, 1000)
+        amt = get_amount(line)
         for n in ["07", "70", "18", "81", "24", "42", "35", "53", "69", "96"]:
             add_number(rows, n, amt)
         return rows, warns
 
+    # 4. ပါဝါ
     if re.search(r"ပါဝါ|power", line, re.I):
-        amt = _last_amount(line, 1000)
+        amt = get_amount(line)
         for n in ["05", "50", "16", "61", "27", "72", "38", "83", "49", "94"]:
             add_number(rows, n, amt)
         return rows, warns
 
-    # ခွေ
+    # 5. ခွေ
     kh = re.search(r"(\d{2,5})\s*(ခွေ|အခွေ)", line)
     if kh:
         digits = kh.group(1)
-        amt = _last_amount(line, 1000)
+        amt = get_amount(line)
         inc = bool(re.search(r"အပူးပါ|ပူးပါ|အပူးအပါ", line))
         combos = product(set(digits), repeat=2) if inc else permutations(digits, 2)
         added = set()
@@ -283,16 +150,119 @@ def parse_single_line(line):
                 add_number(rows, n, amt)
         return rows, warns
 
-    # Delegate to segment parser
-    r, w, matched = parse_segment(line)
-    if matched:
-        return r, w
+    # 6. BK / ဘရိတ်
+    bks = re.findall(r"(\d)\s*(bk|ဘရိတ်|B)(?![a-zA-Z])", line, re.I)
+    if bks:
+        amt = get_amount(line)
+        for m in bks:
+            for n in _bk_for_digit(m[0]):
+                add_number(rows, n, amt)
+        return rows, warns
+
+    # 7. ပါတ် / ပတ် / ပက်
+    pa = re.search(r"(\d)\s*(ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ူး)", line)
+    if pa:
+        digit = pa.group(1)
+        amt = get_amount(line)
+        for n in _pat_for_digit(digit):
+            add_number(rows, n, amt)
+        return rows, warns
+
+    # 8. ထိပ်
+    th = re.search(r"(\d)\s*(ထိပ်စီး|ထိပ်)", line)
+    if th:
+        digit = th.group(1)
+        amt = get_amount(line)
+        for i in range(10):
+            add_number(rows, f"{digit}{i}", amt)
+        return rows, warns
+
+    # 9. ပိတ်
+    pt = re.search(r"(\d)\s*(နောက်ပိတ်|ပိတ်)", line)
+    if pt:
+        digit = pt.group(1)
+        amt = get_amount(line)
+        for i in range(10):
+            add_number(rows, f"{i}{digit}", amt)
+        return rows, warns
+
+    # 10. @ (Reverse amount)
+    if "@" in line:
+        parts = line.split("@")
+        if len(parts) == 2:
+            amt = get_amount(parts[1])
+            nums = re.findall(r"\d{1,2}", parts[0])
+            for n in nums:
+                n = n.zfill(2)
+                add_number(rows, n, amt)
+                if n != n[::-1]:
+                    add_number(rows, n[::-1], amt)
+            return rows, warns
+
+    # 11. R / Reverse (85.2000.r.500 / 20.29.r.500 / 93 4000r2000)
+    if re.search(r"[rR]", line):
+        parts = re.split(r"[rR]", line)
+        if len(parts) == 2:
+            left, right = parts
+            rev_amt = get_amount(right)
+            
+            # parse left for numbers and base amount
+            left_clean = re.sub(r"[^\d\s.,/-]", " ", left)
+            tokens = [t for t in re.split(r"[\s.,/-]+", left_clean) if t]
+            
+            base_amt = rev_amt # Default if no base amount found
+            nums = []
+            if tokens and len(tokens[-1]) >= 3:
+                base_amt = int(tokens[-1])
+                tokens = tokens[:-1]
+                
+            for t in tokens:
+                if len(t) <= 2:
+                    nums.append(t.zfill(2))
+                    
+            for n in nums:
+                add_number(rows, n, base_amt)
+                if n != n[::-1]:
+                    add_number(rows, n[::-1], rev_amt)
+            return rows, warns
+
+    # 12. Dot format with amount at end (66.2000 / 44.99.250 / 00.500)
+    parts = [p for p in re.split(r"[\s.,/]+", line) if p]
+    if parts and len(parts[-1]) >= 3 and parts[-1].isdigit():
+        amt = int(parts[-1])
+        for n in parts[:-1]:
+            if len(n) <= 2:
+                add_number(rows, n.zfill(2), amt)
+        return rows, warns
+
+    # 13. Space / comma separated numbers with amount (99 5000 / 44 500)
+    if re.fullmatch(r"[\d\s.,/-]+", line):
+        tokens = [t for t in re.split(r"[\s.,/-]+", line) if t]
+        if len(tokens) > 1 and len(tokens[-1]) >= 3:
+            amt = int(tokens[-1])
+            for n in tokens[:-1]:
+                add_number(rows, n.zfill(2), amt)
+            return rows, warns
+        elif all(len(t) <= 2 for t in tokens):
+            for n in tokens:
+                add_number(rows, n.zfill(2), 1000, is_default=True)
+            return rows, warns
+
+    # 14. Fallback for 11/99/77*3000
+    list_amt = re.fullmatch(
+        r"((?:\d{1,2}[\s/,\-\.]+)*\d{1,2})\s*[\*=]?\s*(\d{3,6})", line
+    )
+    if list_amt:
+        amt = int(list_amt.group(2))
+        for n in re.findall(r"\d{1,2}", list_amt.group(1)):
+            add_number(rows, n, amt)
+        return rows, warns
 
     warns.append(f"Unrecognized: '{line}'")
     return rows, warns
 
 # =========================================================
-# MAIN PARSER
+# MAIN PARSER LOOP
 # =========================================================
 def parse_bets_locally(text):
     rows, warnings, errors = [], [], []
@@ -319,21 +289,8 @@ def parse_bets_locally(text):
                 pending.clear()
             continue
 
-        # List-with-trailing-amount pre-check (preserves T2: 11/99/77*3000)
-        list_amt = re.fullmatch(
-            r"((?:\d{1,2}[\s/,\-\.]+)*\d{1,2})\s*[\*=]?\s*(\d{3,6})", line
-        )
-        if list_amt:
-            amt = int(list_amt.group(2))
-            for n in re.findall(r"\d{1,2}", list_amt.group(1)):
-                add_number(rows, n, amt)
-            continue
-
         try:
-            if is_complex_line(line):
-                new_rows, new_warns = parse_complex_line(line)
-            else:
-                new_rows, new_warns = parse_single_line(line)
+            new_rows, new_warns = parse_line(line)
             for r in new_rows:
                 if r.get("_default"):
                     pending.append(r)
@@ -348,7 +305,7 @@ def parse_bets_locally(text):
     return {"rows": rows, "warnings": warnings, "errors": errors}
 
 # =========================================================
-# PROCESS & ADD
+# PROCESS & ADD TO LEDGER
 # =========================================================
 def process_and_add_bets(extracted, date_str, day, customer):
     valid, blocked = [], []
@@ -370,10 +327,7 @@ def process_and_add_bets(extracted, date_str, day, customer):
         except (ValueError, TypeError):
             invalid += 1
             continue
-        if len(num) != 2 or not num.isdigit():
-            invalid += 1
-            continue
-        if amt < 100 or amt > 500000:
+        if len(num) != 2 or not num.isdigit() or amt < 100 or amt > 500000:
             invalid += 1
             continue
         if num in blocked_numbers:
@@ -537,28 +491,6 @@ def generate_styled_excel(df, comm_pct, payout, win_num_in, limit):
     return out.getvalue()
 
 # =========================================================
-# PARSER TEST RUNNER (sidebar)
-# =========================================================
-with st.sidebar.expander("🧪 Parser Test Runner"):
-    if st.button("Run All Tests"):
-        tests = [
-            ("T1 နေ့ရှင်း", "44 99 11\n11000နေ့ရှင်း", 33000),
-            ("T2 slash*", "11/99/77*3000\n33/55*1000", 11000),
-            ("T3 r-reverse", "46/96r1500", 6000),
-            ("T4 bk-multi", "5bk/7bk250", 5000),
-            ("T5 ပက်", "7ပက်2500", 47500),
-            ("T6 multi-R", "30-35-50-R1500", 9000),
-            ("T7 single*", "77*2500", 2500),
-            ("T9 leading-0", "01/02/03*1000", 3000),
-            ("T10 dup", "11*1000\n11*1000", 2000),
-        ]
-        for name, txt, exp in tests:
-            res = parse_bets_locally(txt)
-            actual = sum(r["Amount"] for r in res["rows"])
-            mark = "✅" if actual == exp else "❌"
-            st.write(f"{mark} {name}: `{actual:,}` (exp `{exp:,}`)")
-
-# =========================================================
 # ENTRY SECTION
 # =========================================================
 st.subheader("📝 စာရင်းသွင်းရန်")
@@ -582,7 +514,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="44 99 11\n11000နေ့ရှင်း\n11/99/77*3000\n46/96r1500\n5bk/7bk250\n7ပက်2500",
+        placeholder="85.2000.r.500\n45.700.r 300\n20.29.r.500\nအပူး500\n25@1000\n93 4000r2000\n43,45, r500\n44.99.250",
         height=180,
     )
 
@@ -600,7 +532,7 @@ if st.button("🔍 Parse & Preview", type="primary"):
         st.rerun()
 
 # =========================================================
-# PREVIEW SECTION
+# PREVIEW SECTION (Fixed Missing Lines & Added Summary)
 # =========================================================
 p = st.session_state.pending_parse
 if p:
@@ -614,7 +546,20 @@ if p:
 
     if p["rows"]:
         df_prev = pd.DataFrame(p["rows"])[["Number", "Amount"]]
-        st.caption(f"ကွက် {len(df_prev)} ခု | စုစုပေါင်း **{df_prev['Amount'].sum():,.0f}** ကျပ်")
+        total_bets = len(df_prev)
+        total_amt = df_prev['Amount'].sum()
+        
+        # Summary Metrics Box
+        st.info(f"**စုစုပေါင်း အကွက်ရေ:** {total_bets} ကွက် | **စုစုပေါင်း ပမာဏ:** {total_amt:,.0f} ကျပ်")
+        
+        # Winning Number Check
+        if winning_number.strip():
+            win_check = winning_number.strip().zfill(2)
+            win_matches = df_prev[df_prev['Number'] == win_check]
+            if not win_matches.empty:
+                st.warning(f"🏆 **Winning Number ({win_check}) ပါဝင်နေပါသည်။** ထိုးငွေ: {win_matches['Amount'].sum():,.0f} ကျပ်")
+            else:
+                st.success(f"✅ **Winning Number ({win_check}) မပါဝင်ပါ။**")
 
         edited = st.data_editor(
             df_prev, hide_index=True, use_container_width=True, num_rows="dynamic",
@@ -626,7 +571,7 @@ if p:
 
         cs, cc = st.columns(2)
         with cs:
-            if st.button("✅ Save to Ledger", type="primary"):
+            if st.button("✅ Save to Ledger", type="primary", use_container_width=True):
                 rows_fixed = []
                 for _, row in edited.iterrows():
                     try:
@@ -661,17 +606,17 @@ if p:
                     st.session_state.flash_warning = "သိမ်းဆည်းနိုင်သော ကွက် မရှိပါ။"
                     st.rerun()
         with cc:
-            if st.button("❌ Cancel"):
+            if st.button("❌ Cancel", use_container_width=True):
                 st.session_state.pending_parse = None
                 st.rerun()
     else:
-        st.warning("Parse မှ ရလဒ် မထွက်ပါ။ စာသားပုံစံကို စစ်ဆေးပါ။")
+        st.error("Parse မှ ရလဒ် မထွက်ပါ။ စာသားပုံစံကို စစ်ဆေးပါ။")
         if st.button("❌ Cancel"):
             st.session_state.pending_parse = None
             st.rerun()
 
 # =========================================================
-# DASHBOARD
+# DASHBOARD (မူရင်းအတိုင်း)
 # =========================================================
 st.markdown("---")
 
