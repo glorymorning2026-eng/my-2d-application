@@ -96,7 +96,7 @@ def _pat_for_digit(digit):
     return [f"{i:02d}" for i in range(100) if digit in f"{i:02d}"]
 
 # =========================================================
-# LINE PARSER
+# LINE PARSER (CORE LOGIC)
 # =========================================================
 def parse_line(line):
     rows = []
@@ -186,7 +186,29 @@ def parse_line(line):
             add_number(rows, f"{i}{digit}", amt)
         return rows, warns
 
-    # 10. @ (Reverse amount)
+    # 10. အထူး Format: num_base@rev (ဥပမာ - 20_4000@1000)
+    m = re.fullmatch(r"(\d{1,2})[\s_\-]+(\d+)@(\d+)", line)
+    if m:
+        num = m.group(1).zfill(2)
+        base_amt = int(m.group(2))
+        rev_amt = int(m.group(3))
+        add_number(rows, num, base_amt)
+        if num != num[::-1]:
+            add_number(rows, num[::-1], rev_amt)
+        return rows, warns
+
+    # 11. အထူး Format: num_base r rev (ဥပမာ - 20_4000r1000)
+    m = re.fullmatch(r"(\d{1,2})[\s_\-]+(\d+)[rR](\d+)", line)
+    if m:
+        num = m.group(1).zfill(2)
+        base_amt = int(m.group(2))
+        rev_amt = int(m.group(3))
+        add_number(rows, num, base_amt)
+        if num != num[::-1]:
+            add_number(rows, num[::-1], rev_amt)
+        return rows, warns
+
+    # 12. @ (Reverse amount) - ရိုးရိုး 25@1000
     if "@" in line:
         parts = line.split("@")
         if len(parts) == 2:
@@ -199,18 +221,28 @@ def parse_line(line):
                     add_number(rows, n[::-1], amt)
             return rows, warns
 
-    # 11. R / Reverse (85.2000.r.500 / 20.29.r.500 / 93 4000r2000)
+    # 13. R / Reverse (85.2000.r.500 / 43,45, r500 / 4000r2000)
     if re.search(r"[rR]", line):
+        # ဂဏန်းမပါဘဲ ပမာဏပဲပါတဲ့ typo ဖြစ်နေလျှင် (ဥပမာ 4000r2000 -> 40=4000, 04=2000)
+        typo = re.fullmatch(r"(\d{4})[rR](\d+)", line)
+        if typo:
+            num = typo.group(1)[:2]
+            base_amt = int(typo.group(1)) 
+            rev_amt = int(typo.group(2))
+            add_number(rows, num, base_amt)
+            if num != num[::-1]:
+                add_number(rows, num[::-1], rev_amt)
+            warns.append(f"Ambiguous '{line}' → assumed {num}={base_amt}, {num[::-1]}={rev_amt}")
+            return rows, warns
+
         parts = re.split(r"[rR]", line)
         if len(parts) == 2:
             left, right = parts
             rev_amt = get_amount(right)
-            
-            # parse left for numbers and base amount
             left_clean = re.sub(r"[^\d\s.,/-]", " ", left)
             tokens = [t for t in re.split(r"[\s.,/-]+", left_clean) if t]
             
-            base_amt = rev_amt # Default if no base amount found
+            base_amt = rev_amt
             nums = []
             if tokens and len(tokens[-1]) >= 3:
                 base_amt = int(tokens[-1])
@@ -224,9 +256,12 @@ def parse_line(line):
                 add_number(rows, n, base_amt)
                 if n != n[::-1]:
                     add_number(rows, n[::-1], rev_amt)
+                    
+            if not nums and tokens:
+                warns.append(f"Could not extract numbers from '{left}'")
             return rows, warns
 
-    # 12. Dot format with amount at end (66.2000 / 44.99.250 / 00.500)
+    # 14. Dot format with amount at end (66.2000 / 44.99.250 / 00.500)
     parts = [p for p in re.split(r"[\s.,/]+", line) if p]
     if parts and len(parts[-1]) >= 3 and parts[-1].isdigit():
         amt = int(parts[-1])
@@ -235,7 +270,7 @@ def parse_line(line):
                 add_number(rows, n.zfill(2), amt)
         return rows, warns
 
-    # 13. Space / comma separated numbers with amount (99 5000 / 44 500)
+    # 15. Space / comma separated numbers with amount (99 5000 / 44 500)
     if re.fullmatch(r"[\d\s.,/-]+", line):
         tokens = [t for t in re.split(r"[\s.,/-]+", line) if t]
         if len(tokens) > 1 and len(tokens[-1]) >= 3:
@@ -248,7 +283,7 @@ def parse_line(line):
                 add_number(rows, n.zfill(2), 1000, is_default=True)
             return rows, warns
 
-    # 14. Fallback for 11/99/77*3000
+    # 16. Fallback for list amounts like 11/99/77*3000
     list_amt = re.fullmatch(
         r"((?:\d{1,2}[\s/,\-\.]+)*\d{1,2})\s*[\*=]?\s*(\d{3,6})", line
     )
@@ -514,7 +549,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="85.2000.r.500\n45.700.r 300\n20.29.r.500\nအပူး500\n25@1000\n93 4000r2000\n43,45, r500\n44.99.250",
+        placeholder="85.2000.r.500\n45.700.r 300\n20.29.r.500\nအပူး500\n25@1000\n93 4000r2000\n43,45, r500\n44.99.250\n20_4000@1000",
         height=180,
     )
 
@@ -549,10 +584,10 @@ if p:
         total_bets = len(df_prev)
         total_amt = df_prev['Amount'].sum()
         
-        # Summary Metrics Box
+        # Summary Metrics Box (အသစ်ထည့်ထားသည်)
         st.info(f"**စုစုပေါင်း အကွက်ရေ:** {total_bets} ကွက် | **စုစုပေါင်း ပမာဏ:** {total_amt:,.0f} ကျပ်")
         
-        # Winning Number Check
+        # Winning Number Check (အသစ်ထည့်ထားသည်)
         if winning_number.strip():
             win_check = winning_number.strip().zfill(2)
             win_matches = df_prev[df_prev['Number'] == win_check]
@@ -616,7 +651,7 @@ if p:
             st.rerun()
 
 # =========================================================
-# DASHBOARD (မူရင်းအတိုင်း)
+# DASHBOARD
 # =========================================================
 st.markdown("---")
 
