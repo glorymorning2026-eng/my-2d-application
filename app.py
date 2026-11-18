@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Exact Amount Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Advanced Strict Regex Parser & Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=500000, step=50000)
@@ -47,7 +47,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Date", "Day", "Customer", "BatchID", "Number", "Amount"])
 
-# --- Comprehensive Local 2D Rules Parsing Engine with Exact Amount Support ---
+# --- Advanced Precision 2D Rules Parsing Engine ---
 def parse_bets_locally(text):
     rows = []
     lines = text.replace("၊", "\n").replace(";", "\n").split("\n")
@@ -71,8 +71,8 @@ def parse_bets_locally(text):
                         rows.append({"Number": n, "Amount": amt})
             continue
 
-        # 2. Ah-Pu (အပူ)
-        if re.search(r'အပူ', line):
+        # 2. Ah-Pu (အပူ / ပူး)
+        if re.search(r'အပူ|ပူး', line):
             amt_match = re.search(r'(\d+)', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
             doubles = [f"{i}{i}" for i in range(10)]
@@ -123,7 +123,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 7. Thate (ထိပ်စီး) - e.g., 5ထိပ်စီး 20000 or 5ထိပ် 20000
+        # 7. Thate (ထိပ်စီး)
         thate_match = re.search(r'(\d)\s*(ထိပ်စီး|ထိပ်)', line)
         if thate_match:
             t_dig = thate_match.group(1)
@@ -165,7 +165,48 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 10. Complex slash/dash list with amounts and R (e.g., 51/52/58-50000r10000 or 51/52/58-50000)
+        # 10. Number with @ amount format (e.g., 20@3000 or 89_3000@2000)
+        at_match = re.search(r'^(\d{1,2})[\_\.](\d+)@(\d+)$', line)
+        if at_match:
+            n1 = at_match.group(1).zfill(2)
+            base_amt = int(at_match.group(2))
+            at_amt = int(at_match.group(3))
+            rows.append({"Number": n1, "Amount": base_amt})
+            n2 = n1[::-1]
+            rows.append({"Number": n2, "Amount": at_amt})
+            continue
+
+        at_simple = re.search(r'^(\d{1,2})@(\d+)$', line)
+        if at_simple:
+            n1 = at_simple.group(1).zfill(2)
+            amt = int(at_simple.group(2))
+            rows.append({"Number": n1, "Amount": amt})
+            continue
+
+        # 11. Multi-dot/dash number with .r. or .R. format (e.g., 85.3000.r.500 or 45.43.40.r.250)
+        dot_r_match = re.search(r'^([\d\.\-\/\,\s]+)\.([Rrရ@&အာ])\.(\d+)$', line)
+        if dot_r_match:
+            nums_part = dot_r_match.group(1)
+            rev_amt = int(dot_r_match.group(3))
+            
+            # Extract numbers and any embedded amount
+            parts = nums_part.split('.')
+            real_nums = []
+            base_amt = 1000
+            for p in parts:
+                if p.isdigit():
+                    if len(p) <= 2:
+                        real_nums.append(p.zfill(2))
+                    else:
+                        base_amt = int(p)
+            
+            for n1 in real_nums:
+                rows.append({"Number": n1, "Amount": base_amt})
+                n2 = n1[::-1]
+                rows.append({"Number": n2, "Amount": rev_amt})
+            continue
+
+        # 12. Complex slash/dash list with amounts and R (e.g., 51/52/58-50000r10000)
         complex_match = re.search(r'^([\d\.\-\/\,\s]+)[\-\=](\d+)([Rrရ@&အာ]?)(\d*)$', line)
         if complex_match:
             nums_part = complex_match.group(1)
@@ -183,21 +224,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": n2, "Amount": r_val})
             continue
 
-        # 11. Multi-number with trailing R and amount (e.g., 48.43.19.35.37.46R2000)
-        multi_rev = re.search(r'^([\d\.\-\/\,\s]+)\s*([Rrရ@&အာ])\s*(\d+)$', line)
-        if multi_rev:
-            nums_part = multi_rev.group(1)
-            amt = int(multi_rev.group(3))
-            raw_nums = re.findall(r'\d{1,2}', nums_part)
-            for n_str in raw_nums:
-                n1 = n_str.zfill(2)
-                n2 = n1[::-1]
-                rows.append({"Number": n1, "Amount": amt})
-                if n1 != n2:
-                    rows.append({"Number": n2, "Amount": amt})
-            continue
-
-        # 12. Single Reverse / R (e.g., 45 R 10000)
+        # 13. Single Reverse / R (e.g., 45 R 10000)
         rev_match = re.search(r'(\d{1,2})\s*([Rrရ@&အာ])\s*(\d+)', line)
         if rev_match:
             num1 = rev_match.group(1).zfill(2)
@@ -208,7 +235,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": num2, "Amount": amt})
             continue
             
-        # 13. Multi-number dot/slash/dash list with trailing amount (e.g., 55.66.44.22.11.1000)
+        # 14. Multi-number dot/slash/dash list with trailing amount (e.g., 55.66.44.22.11.1000)
         multi_pairs = re.search(r'^([\d\.\-\/\,\s]+)[\.\-\/\,\s](\d{3,6})$', line)
         if multi_pairs:
             nums_part = multi_pairs.group(1)
@@ -218,7 +245,15 @@ def parse_bets_locally(text):
                 rows.append({"Number": n_str.zfill(2), "Amount": amt})
             continue
 
-        # 14. Direct pairs with separator (e.g., 11 20000, 12-1000)
+        # 15. Single number standalone with amount (e.g., 44.500 or 66.2000)
+        single_amt = re.search(r'^(\d{1,2})[\.\-\s](\d{3,6})$', line)
+        if single_amt:
+            n1 = single_amt.group(1).zfill(2)
+            amt = int(single_amt.group(2))
+            rows.append({"Number": n1, "Amount": amt})
+            continue
+
+        # 16. Direct pairs with separator
         pairs = re.findall(r'(\d{1,2})\s*[\-\=\/\_\.\s]\s*(\d+)', line)
         if pairs:
             for num_str, amt_str in pairs:
@@ -440,7 +475,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     wb.save(output)
     return output.getvalue()
 
-st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Exact Amount Tracker API-Free)")
+st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Advanced Precision Tracker API-Free)")
 
 is_closed = False
 if enable_time_lock:
@@ -461,9 +496,9 @@ entry_date_str = entry_date.strftime("%Y-%m-%d")
 
 col1, col2 = st.columns([1, 2])
 with col1:
-    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မိုးမိုး")
+    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - တံခွန်တိုင်")
 with col2:
-    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="5ထိပ်စီး 20000\n51/52/58-50000r10000", height=130)
+    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="85.3000.r.500\n20@3000\n89_3000@2000", height=130)
 
 if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     if is_closed:
@@ -588,7 +623,7 @@ if not st.session_state.data.empty:
             cust_viber_lines.append(f"ကော်မရှင် ({commission_pct}%) = -{cust_comm:,.0f} ကျပ်")
             cust_viber_lines.append(f"ပေးချေရန် Net = {cust_net_pay:,.0f} ကျပ်")
             if winning_number:
-                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_clean}) = +{cust_win_amt:,.0f} ကျပ်")
+                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_num_clean}) = +{cust_win_amt:,.0f} ကျပ်")
                 bal_label = "ပေးရန် (+) / ရရန် (-)" if cust_final_balance >= 0 else "ရရန်"
                 cust_viber_lines.append(f"ရှင်းတမ်းစုစုပေါင်း ({bal_label}) = {cust_final_balance:,.0f} ကျပ်")
 
