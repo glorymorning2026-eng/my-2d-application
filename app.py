@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import re
@@ -7,8 +8,10 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from itertools import permutations, product
 
+# စာမျက်နှာ အပြင်အဆင် သတ်မှတ်ခြင်း
 st.set_page_config(page_title="Myanmar 2D Master Dealer App", page_icon="📒", layout="wide")
 
+# စတိုင်နှင့် အရောင်များ သတ်မှတ်ခြင်း
 st.markdown("""
     <style>
     .main-header {
@@ -28,6 +31,7 @@ st.markdown("""
 
 st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Ultimate Precision Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
+# --- ဘယ်ဘက် Sidebar ဆက်တင်များ ---
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=500000, step=50000)
 payout_rate = st.sidebar.number_input("ဆုကြေးနှုန်း (ဆ)", value=80, step=5)
@@ -42,14 +46,16 @@ closing_time = st.sidebar.time_input("ပိတ်မည့် အချိန�
 st.sidebar.markdown("---")
 st.sidebar.subheader("🚫 ပိတ်ဂဏန်းများ (Comma ခြားရန်)")
 blocked_input = st.sidebar.text_input("မခံမည့် ဂဏန်းများ (ဥပမာ: 39, 88)", value="")
-blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip()]
+blocked_numbers = [num.strip().zfill(2) for num in blocked_input.split(",") if num.strip()]
 
+# Session State တွင် စာရင်းဒေတာ သိမ်းဆည်းရန် ပြင်ဆင်ခြင်း
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Date", "Day", "Customer", "BatchID", "Number", "Amount"])
 
-# --- Ultimate Precision 2D Rules Parsing Engine ---
+# --- 2D စည်းမျဉ်းအားလုံးကို တိကျစွာ ခွဲခြမ်းစိတ်ဖြာတွက်ချက်ပေးမည့် Engine ---
 def parse_bets_locally(text):
     rows = []
+    # ၊ နှင့် ; တို့ကို လိုင်းသစ်အဖြစ် ပြောင်းလဲခြင်း
     lines = text.replace("၊", "\n").replace(";", "\n").split("\n")
     
     for line in lines:
@@ -57,7 +63,7 @@ def parse_bets_locally(text):
         if not line:
             continue
             
-        # 1. ညီအကို / ညီကို
+        # ၁။ ညီအကို / ညီကို (Sequential Pairs)
         if re.search(r'ညီအကို|ညီကို', line):
             amt_match = re.search(r'(\d+)', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
@@ -71,8 +77,8 @@ def parse_bets_locally(text):
                         rows.append({"Number": n, "Amount": amt})
             continue
 
-        # 2. Ah-Pu (အပူ / ပူး)
-        if re.search(r'အပူ|ပူး', line):
+        # ၂။ အပူ / ပူး (Doubles: 00-99)
+        if re.search(r'အပူ|ပူး', line) and not re.search(r'ခွေ', line):
             amt_match = re.search(r'(\d+)', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
             doubles = [f"{i}{i}" for i in range(10)]
@@ -80,7 +86,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": d, "Amount": amt})
             continue
 
-        # 3. Nakhat (နက္ခတ်)
+        # ၃။ နက္ခတ် (Nakhat)
         if re.search(r'နက္ခတ်', line):
             amt_match = re.search(r'(\d+)', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
@@ -89,7 +95,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": n, "Amount": amt})
             continue
 
-        # 4. Power (ပါဝါ)
+        # ၄။ ပါဝါ (Power)
         if re.search(r'ပါဝါ|power', line, re.IGNORECASE):
             amt_match = re.search(r'(\d+)', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
@@ -98,7 +104,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": p, "Amount": amt})
             continue
 
-        # 5. Break / B / bk (ဘရိတ်)
+        # ၅။ ဘရိတ် (Break / B / bk) - ဥပမာ: 4 B 1500
         break_match = re.search(r'(\d)\s*(ဘရိတ်|B|bk)', line, re.IGNORECASE)
         if break_match:
             b_val = int(break_match.group(1))
@@ -111,7 +117,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 6. Paat-Thie (ပါတ်သီး)
+        # ၆။ ပါတ်သီး / ပတ် (Paat-Thie)
         paat_match = re.search(r'(\d)\s*(ပါတ်|ပတ်|ပါ|ပ)', line)
         if paat_match:
             p_dig = paat_match.group(1)
@@ -123,7 +129,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 7. Thate (ထိပ်စီး)
+        # ၇။ ထိပ်စီး / ထိပ် (Thate) - ဥပမာ: 5ထိပ်စီး 20000
         thate_match = re.search(r'(\d)\s*(ထိပ်စီး|ထိပ်)', line)
         if thate_match:
             t_dig = thate_match.group(1)
@@ -134,7 +140,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 8. Pate (နောက်ပိတ်)
+        # ၈။ နောက်ပိတ် / ပိတ် (Pate)
         pate_match = re.search(r'(\d)\s*(နောက်ပိတ်|ပိတ်)', line)
         if pate_match:
             pt_dig = pate_match.group(1)
@@ -145,15 +151,15 @@ def parse_bets_locally(text):
                 rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 9. Khve (အခွေ)
-        khve_match = re.search(r'([\d]{2,3})\s*(ခွေ|အခွေ)', line)
+        # ၉။ အခွေ / ခွေ (Khve) - အပူးပါ / မပါ ခွဲခြားတွက်ချက်ခြင်း
+        khve_match = re.search(r'([\d]{2,5})\s*(ခွေ|အခွေ)', line)
         if khve_match:
             digits = khve_match.group(1)
-            include_doubles = bool(re.search(r'အပူးပါ|ပူးပါ', line))
+            include_doubles = bool(re.search(r'အပူးပါ|ပူးပါ|အပူးအပါ', line))
             amt_match = re.search(r'(\d+)$', line)
             amt = int(amt_match.group(1)) if amt_match else 1000
             
-            perms = list(permutations(digits, 2)) if len(digits) == 2 else set(permutations(digits, 2))
+            perms = list(permutations(digits, 2))
             if include_doubles:
                 perms = list(product(set(digits), repeat=2))
             
@@ -165,7 +171,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 10. Number with @ amount format (e.g., 20@3000 or 89_3000@2000)
+        # ၁၀။ @ နှင့် _ ပါသော အထူးပုံစံ (ဥပမာ: 20_4000@1000 သို့မဟုတ် 89_3000@2000)
         at_match = re.search(r'^(\d{1,2})[\_\.](\d+)@(\d+)$', line)
         if at_match:
             n1 = at_match.group(1).zfill(2)
@@ -176,6 +182,7 @@ def parse_bets_locally(text):
             rows.append({"Number": n2, "Amount": at_amt})
             continue
 
+        # ရိုးရိုး @ ပုံစံ (ဥပမာ: 20@3000)
         at_simple = re.search(r'^(\d{1,2})@(\d+)$', line)
         if at_simple:
             n1 = at_simple.group(1).zfill(2)
@@ -183,30 +190,48 @@ def parse_bets_locally(text):
             rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 11. Advanced Precision Multi-dot/dash number with .r. or R format (e.g., 85.3000.r.500, 45.43.40.r.250, 82.45.10.20.40.50.58.r.250)
-        match_dot_r = re.search(r'^([\d\.\-\/\,\s]+?)\.?\s*[Rr]\s*(\d+)$', line)
+        # ၁၁။ Slash/Dash နှင့် r တွဲလျက်ပါသော ပုံစံ (ဥပမာ: 51/52/58-50000r10000)
+        complex_slash_r = re.search(r'^([\d\.\-\/\,\s]+)[\-\=](\d+)([Rrရ@&အာ])(\d+)$', line)
+        if complex_slash_r:
+            nums_part = complex_slash_r.group(1)
+            base_amt = int(complex_slash_r.group(2))
+            rev_amt = int(complex_slash_r.group(4))
+            raw_nums = re.findall(r'\d{1,2}', nums_part)
+            for n_str in raw_nums:
+                n1 = n_str.zfill(2)
+                rows.append({"Number": n1, "Amount": base_amt})
+                n2 = n1[::-1]
+                rows.append({"Number": n2, "Amount": rev_amt})
+            continue
+
+        # ၁၂။ အစက်များနှင့် .r. ပါဝင်သော ပုံစံ (ဥပမာ: 85.3000.r.500, 45.43.40.r.250, 82.45.10.20.40.50.58.r.250)
+        match_dot_r = re.search(r'^([\d\.\-\/\,\s]+?)\.?\s*[Rr]\.?\s*(\d+)$', line)
         if match_dot_r:
             nums_part = match_dot_r.group(1)
             rev_amt = int(match_dot_r.group(2))
             
-            tokens = re.split(r'[\.\-\/\,\s]+', nums_part)
+            tokens = [t for t in re.split(r'[\.\-\/\,\s]+', nums_part) if t.isdigit()]
             raw_nums = []
-            base_amt = 1000
+            base_amt = None
             
+            # ဂဏန်းနှင့် မူလထိုးငွေ (ဥပမာ 3000) ခွဲထုတ်ခြင်း
             for t in tokens:
-                if t.isdigit():
-                    if len(t) <= 2:
-                        raw_nums.append(t.zfill(2))
-                    else:
-                        base_amt = int(t)
+                if len(t) <= 2:
+                    raw_nums.append(t.zfill(2))
+                else:
+                    base_amt = int(t)
             
+            # အကယ်၍ မူလထိုးငွေ သီးသန့်မပါခဲ့လျှင် r နောက်မှ ငွေပမာဏကို အတူတူယူမည်
+            if base_amt is None:
+                base_amt = rev_amt
+                
             for n1 in raw_nums:
                 rows.append({"Number": n1, "Amount": base_amt})
                 n2 = n1[::-1]
                 rows.append({"Number": n2, "Amount": rev_amt})
             continue
 
-        # 12. Multi-number with dot/slash/dash and trailing amount (no R) (e.g., 66.77.88.1000, 22.77.2500)
+        # ၁၃။ ဂဏန်းအများကြီးနှင့် နောက်ဆုံးတွင် ထိုးငွေတစ်ခုတည်းပါသော ပုံစံ (ဥပမာ: 66.77.88.1000, 22.77.2500)
         match_multi_amt = re.search(r'^([\d\.\-\/\,\s]+?)[\.\-\/\,\s](\d{3,6})$', line)
         if match_multi_amt:
             nums_part = match_multi_amt.group(1)
@@ -217,7 +242,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 13. Single Reverse / R (e.g., 20R2500)
+        # ၁၄။ တစ်ကွက်တည်း ပြောင်းပြန် / R (ဥပမာ: 20R2500 သို့မဟုတ် 45 R 10000)
         single_r = re.search(r'^(\d{1,2})\s*[Rr]\s*(\d+)$', line)
         if single_r:
             n1 = single_r.group(1).zfill(2)
@@ -228,7 +253,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": n2, "Amount": amt})
             continue
 
-        # 14. Single number with amount
+        # ၁၅။ တစ်ကွက်တည်း ရိုးရိုးထိုးငွေ (ဥပမာ: 44.500 သို့မဟုတ် 66.2000)
         single_amt = re.search(r'^(\d{1,2})[\.\-\s](\d{3,6})$', line)
         if single_amt:
             n1 = single_amt.group(1).zfill(2)
@@ -236,7 +261,7 @@ def parse_bets_locally(text):
             rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 15. Direct pairs with separator fallback
+        # ၁၆။ အခြား ခွဲခြားသင်္ကေတများပါသော အတွဲများ (Fallback)
         pairs = re.findall(r'(\d{1,2})\s*[\-\=\/\_\.\s]\s*(\d+)', line)
         if pairs:
             for num_str, amt_str in pairs:
@@ -248,12 +273,14 @@ def parse_bets_locally(text):
             
     return rows
 
+# --- စာရင်းများကို စစ်ဆေးပြီး BatchID ဖြင့် သိမ်းဆည်းပေးမည့် Function ---
 def process_and_add_bets(extracted_data, entry_date_str, selected_day, default_customer):
     valid_rows = []
     blocked_found = []
     invalid_amt_found = 0
     total_added_amount = 0
     
+    # ဖောက်သည်တစ်ဦးချင်းစီအတွက် Batch နံပါတ် အစဉ်လိုက် တပ်ပေးခြင်း (ဥပမာ: သိမ့်(1), သိမ့်(2))
     existing_batches = st.session_state.data[st.session_state.data["Customer"] == default_customer]["BatchID"]
     next_batch_num = 1
     if not existing_batches.empty:
@@ -289,6 +316,7 @@ def process_and_add_bets(extracted_data, entry_date_str, selected_day, default_c
             
     return valid_rows, blocked_found, invalid_amt_found, total_added_amount
 
+# --- Multi-Tab Excel အစီရင်ခံစာ ထုတ်ပေးမည့် Function ---
 def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_limit):
     output = io.BytesIO()
     wb = openpyxl.Workbook()
@@ -316,6 +344,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
 
     win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
 
+    # TAB 1: စာရင်းချုပ်အကျဉ်း
     ws_sum = wb.active
     ws_sum.title = "စာရင်းချုပ်အကျဉ်း"
     ws_sum["A1"] = "မြန်မာနှစ်လုံးထီ (2D) ငွေစာရင်းချုပ် အစီရင်ခံစာ"
@@ -364,6 +393,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
 
     format_sheet(ws_sum, {"A": 42, "B": 24, "C": 38})
 
+    # TAB 2: နေ့အလိုက်_အပတ်စဉ်
     ws_day = wb.create_sheet(title="နေ့အလိုက်_အပတ်စဉ်")
     ws_day["A1"] = "နေ့အလိုက် နှင့် တစ်ပတ်စာ စာရင်းချုပ်"
     ws_day["A1"].font = font_title
@@ -386,6 +416,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
             if r_idx % 2 == 1: c.fill = zebra_fill
     format_sheet(ws_day, {"A": 18, "B": 16, "C": 14, "D": 22, "E": 20, "F": 22})
 
+    # TAB 3: ဖောက်သည်အလိုက် ရှင်းတမ်း
     ws_cust = wb.create_sheet(title="ဖောက်သည်အလိုက် ရှင်းတမ်း")
     ws_cust["A1"] = "ဖောက်သည်တစ်ဦးချင်းစီ၏ ရှင်းတမ်း"
     ws_cust["A1"].font = font_title
@@ -414,6 +445,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
             if r_idx % 2 == 1: c.fill = zebra_fill
     format_sheet(ws_cust, {"A": 26, "B": 22, "C": 20, "D": 24, "E": 24, "F": 24})
 
+    # TAB 4: ဂဏန်းပေါင်းချုပ်_Limit
     ws_num = wb.create_sheet(title="ဂဏန်းပေါင်းချုပ်_Limit")
     ws_num["A1"] = "ဂဏန်းအလိုက် စုစုပေါင်းနှင့် Limit ထိန်းချုပ်မှု"
     ws_num["A1"].font = font_title
@@ -427,12 +459,15 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
         c_num = ws_num.cell(row=r_idx, column=1, value=str(row.Number).zfill(2))
         c_num.alignment = Alignment(horizontal="center"); c_num.number_format = "@"
         ws_num.cell(row=r_idx, column=2, value=float(row.Amount)).number_format = "#,##0"
-        ws_num.cell(row=r_idx, column=3, value=f"=B{r_idx}").number_format = "#,##0"
-        ws_num.cell(row=r_idx, column=4, value=0).number_format = "#,##0"
+        ws_num.cell(row=r_idx, column=3, value=f"=MIN(B{r_idx},{max_limit})").number_format = "#,##0"
+        ws_num.cell(row=r_idx, column=4, value=f"=B{r_idx}-C{r_idx}").number_format = "#,##0"
         for c_i in range(1, 5):
             c = ws_num.cell(row=r_idx, column=c_i); c.font = font_body; c.border = thin_border
+            if float(row.Amount) > max_limit and c_i == 4:
+                c.fill = loss_fill; c.font = font_bold
     format_sheet(ws_num, {"A": 16, "B": 24, "C": 24, "D": 26})
 
+    # TAB 5: အသေးစိတ်စာရင်း
     ws_det = wb.create_sheet(title="အသေးစိတ်စာရင်း")
     ws_det["A1"] = "အသေးစိတ် စာရင်းမှတ်တမ်း"
     ws_det["A1"].font = font_title
@@ -458,6 +493,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     wb.save(output)
     return output.getvalue()
 
+# --- ပင်မ စာရင်းသွင်းရာ အပိုင်း ---
 st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Ultimate Precision Tracker API-Free)")
 
 is_closed = False
@@ -479,9 +515,9 @@ entry_date_str = entry_date.strftime("%Y-%m-%d")
 
 col1, col2 = st.columns([1, 2])
 with col1:
-    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - တံခွန်တိုင်")
+    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - သိမ့်")
 with col2:
-    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="85.3000.r.500\n20@3000\n82.45.10.20.40.50.58.r.250", height=130)
+    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="85.3000.r.500\n20@3000\n82.45.10.20.40.50.58.r.250\n5ထိပ်စီး 20000\n4 B 1500", height=130)
 
 if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     if is_closed:
@@ -489,26 +525,30 @@ if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     elif not cust_manual or not smart_input_text:
         st.warning("ဖောက်သည် အမည်နှင့် ထိုးမည့် စာသားကို ဖြည့်သွင်းပါ။")
     else:
-        extracted_data = parse_bets_locally(smart_input_text)
-        valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, entry_date_str, selected_day, cust_manual)
-        
-        if valid_rows:
-            st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
-            st.success(f"🎉 စာရင်းသွင်းပြီးပါပြီ! ({cust_manual}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
-            if blocked_found:
-                st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
-            st.rerun()
-        else:
-            st.warning("စနစ်က ဂဏန်းနှင့် ငွေပမာဏကို ရှာမတွေ့ပါ။ စာသားပုံစံ မှန်/မမှန် စစ်ဆေးပါ။")
+        try:
+            clean_cust = cust_manual.strip()
+            extracted_data = parse_bets_locally(smart_input_text)
+            valid_rows, blocked_found, invalid_amt, total_amt = process_and_add_bets(extracted_data, entry_date_str, selected_day, clean_cust)
+            
+            if valid_rows:
+                st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame(valid_rows)], ignore_index=True)
+                st.success(f"🎉 စာရင်းသွင်းပြီးပါပြီ! ({clean_cust}) စုစုပေါင်းထိုးငွေ = {total_amt:,} ကျပ် ({len(valid_rows)} ကွက်)")
+                if blocked_found:
+                    st.warning(f"🚫 ပိတ်ဂဏန်းများ ဖယ်ထုတ်ထားပါသည်: {', '.join(set(blocked_found))}")
+                st.rerun()
+            else:
+                st.warning("စနစ်က ဂဏန်းနှင့် ငွေပမာဏကို ရှာမတွေ့ပါ။ စာသားပုံစံ မှန်/မမှန် စစ်ဆေးပါ။")
+        except Exception as e:
+            st.error(f"စာရင်းတွက်ချက်ရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်: {e}")
 
+# --- စာရင်းချုပ် ပြသခြင်းနှင့် Statement ထုတ်ပေးခြင်း ---
 st.markdown("---")
 if not st.session_state.data.empty:
     df = st.session_state.data
     
     total_sales = df["Amount"].sum()
-    commission_amt = total_sales * (commission_pct / 100)
+    commission_amt = total_sales * (commission_pct / 100.0)
     net_sales = total_sales - commission_amt
-    total_bets = len(df)
     
     win_num_clean = str(winning_number).strip().zfill(2) if winning_number else ""
     payout_amount = 0
@@ -519,6 +559,7 @@ if not st.session_state.data.empty:
         payout_amount = winning_total_amt * payout_rate
     net_pl = net_sales - payout_amount
 
+    # အပေါ်ပိုင်း အကျဉ်းချုပ် ကိန်းဂဏန်းများ
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("💰 စုစုပေါင်း ရောင်းရငွေ", f"{total_sales:,.0f} MMK")
     m2.metric(f"💸 ကော်မရှင် ({commission_pct}%)", f"{commission_amt:,.0f} MMK")
@@ -527,6 +568,7 @@ if not st.session_state.data.empty:
     
     st.markdown("---")
     
+    # ပေါက်ဂဏန်း တိုက်စစ်ခြင်း
     st.subheader("🎯 ပေါက်ဂဏန်း ကံထူးသူများ စာရင်း တိုက်စစ်ခြင်း")
     if winning_number:
         if not winning_matched.empty:
@@ -545,6 +587,7 @@ if not st.session_state.data.empty:
     
     col_rep1, col_rep2 = st.columns([1, 1])
     
+    # ဘယ်ဘက်အခြမ်း - ဒိုင်ချုပ် Viber Report
     with col_rep1:
         st.markdown("##### 📅 တစ်နေ့တာ / တစ်ပတ်စာ စုစုပေါင်း ရှင်းတမ်း")
         day_summary = df.groupby(["Date", "Day"])["Amount"].sum().reset_index()
@@ -563,8 +606,9 @@ if not st.session_state.data.empty:
         status_label = "အမြတ် (+)" if net_pl >= 0 else "အရှုံး (-)"
         report_lines.append(f"📊 အသားတင် {status_label} = {net_pl:,.0f} ကျပ်")
         
-        st.text_area("ဒိုင်ချုပ် Viber Text (Copy ယူရန်)", "\n".join(report_lines), height=140)
+        st.text_area("ဒိုင်ချုပ် Viber Text (Copy ယူရန်)", "\n".join(report_lines), height=180)
 
+    # ညာဘက်အခြမ်း - ဖောက်သည်တစ်ဦးချင်းစီ၏ အထူးဖော်မြူလာပါ Viber Statement
     with col_rep2:
         st.markdown("##### 👤 ဖောက်သည်တစ်ဦးချင်းစီ၏ အသေးစိတ် Batch များနှင့် ပေါင်းချုပ် Statement")
         unique_customers = df["Customer"].unique()
@@ -598,6 +642,7 @@ if not st.session_state.data.empty:
             
             cust_final_balance = cust_net_pay - cust_win_amt
 
+            # အထူးတောင်းဆိုထားသော ပုံစံ: [သိမ့်(1)=သိမ့်(1)၏Total] + [သိမ့်(2)=သိမ့်(2)၏Total] = *(Total ကျပ်)*
             formula_items = [f"[{b[0]}={b[1]:,.0f} ကျပ်]" for b in batch_totals_for_sum]
             formula_string = " + ".join(formula_items) + f" = *({cust_overall_total:,.0f} ကျပ်)*"
 
@@ -610,7 +655,7 @@ if not st.session_state.data.empty:
                 bal_label = "ပေးရန် (+) / ရရန် (-)" if cust_final_balance >= 0 else "ရရန်"
                 cust_viber_lines.append(f"ရှင်းတမ်းစုစုပေါင်း ({bal_label}) = {cust_final_balance:,.0f} ကျပ်")
 
-            st.text_area(f"Viber သို့ ပို့ရန် ({selected_cust_stmt} ရှင်းတမ်းအပြည့်အစုံ)", "\n".join(cust_viber_lines), height=250)
+            st.text_area(f"Viber သို့ ပို့ရန် ({selected_cust_stmt} ရှင်းတမ်းအပြည့်အစုံ)", "\n".join(cust_viber_lines), height=280)
 
     st.markdown("---")
     col_left, col_right = st.columns(2)
@@ -618,8 +663,8 @@ if not st.session_state.data.empty:
     with col_left:
         st.subheader("📊 ဂဏန်းအလိုက် စုစုပေါင်းနှင့် ကန့်သတ်ချက် (Limit Control)")
         grouped = df.groupby("Number")["Amount"].sum().reset_index().sort_values(by="Amount", ascending=False)
-        grouped["Allowed"] = grouped["Amount"]
-        grouped["Excess"] = 0
+        grouped["Allowed"] = grouped["Amount"].apply(lambda x: min(x, max_limit))
+        grouped["Excess"] = grouped["Amount"] - grouped["Allowed"]
         st.dataframe(grouped, use_container_width=True)
         
     with col_right:
@@ -644,3 +689,4 @@ if not st.session_state.data.empty:
             st.rerun()
 else:
     st.info("📒 ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။ အထက်ပါ စာရင်းသွင်းကွက်တွင် ရိုက်ထည့်၍ စာရင်းစတင်သွင်းနိုင်ပါသည်။")
+```
