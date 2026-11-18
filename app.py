@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Advanced Precision Regex Parser & Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Ultimate Precision Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
 max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=500000, step=50000)
@@ -47,7 +47,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Date", "Day", "Customer", "BatchID", "Number", "Amount"])
 
-# --- Advanced Precision 2D Rules Parsing Engine ---
+# --- Ultimate Precision 2D Rules Parsing Engine ---
 def parse_bets_locally(text):
     rows = []
     lines = text.replace("၊", "\n").replace(";", "\n").split("\n")
@@ -98,7 +98,7 @@ def parse_bets_locally(text):
                 rows.append({"Number": p, "Amount": amt})
             continue
 
-        # 5. Break / B / bk (ဘရိတ်) - e.g. 4 B 1500
+        # 5. Break / B / bk (ဘရိတ်)
         break_match = re.search(r'(\d)\s*(ဘရိတ်|B|bk)', line, re.IGNORECASE)
         if break_match:
             b_val = int(break_match.group(1))
@@ -183,17 +183,27 @@ def parse_bets_locally(text):
             rows.append({"Number": n1, "Amount": amt})
             continue
 
-        # 11. Multi-dot/dash number with .r. or R format (e.g., 67.68.78.49.30.23R500 or 64.69.74.79.84.89.R1000)
-        match_multi_r = re.search(r'^([\d\.\-\/\,\s]+?)\.?\s*[Rr]\s*(\d+)$', line)
-        if match_multi_r:
-            nums_part = match_multi_r.group(1)
-            amt = int(match_multi_r.group(2))
-            raw_nums = re.findall(r'\d{1,2}', nums_part)
-            valid_nums = [n.zfill(2) for n in raw_nums if len(n) <= 2]
-            for n1 in valid_nums:
-                rows.append({"Number": n1, "Amount": amt})
+        # 11. Advanced Precision Multi-dot/dash number with .r. or R format (e.g., 85.3000.r.500, 45.43.40.r.250, 82.45.10.20.40.50.58.r.250)
+        match_dot_r = re.search(r'^([\d\.\-\/\,\s]+?)\.?\s*[Rr]\s*(\d+)$', line)
+        if match_dot_r:
+            nums_part = match_dot_r.group(1)
+            rev_amt = int(match_dot_r.group(2))
+            
+            tokens = re.split(r'[\.\-\/\,\s]+', nums_part)
+            raw_nums = []
+            base_amt = 1000
+            
+            for t in tokens:
+                if t.isdigit():
+                    if len(t) <= 2:
+                        raw_nums.append(t.zfill(2))
+                    else:
+                        base_amt = int(t)
+            
+            for n1 in raw_nums:
+                rows.append({"Number": n1, "Amount": base_amt})
                 n2 = n1[::-1]
-                rows.append({"Number": n2, "Amount": amt})
+                rows.append({"Number": n2, "Amount": rev_amt})
             continue
 
         # 12. Multi-number with dot/slash/dash and trailing amount (no R) (e.g., 66.77.88.1000, 22.77.2500)
@@ -448,7 +458,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     wb.save(output)
     return output.getvalue()
 
-st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Advanced Precision Tracker API-Free)")
+st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Ultimate Precision Tracker API-Free)")
 
 is_closed = False
 if enable_time_lock:
@@ -469,9 +479,9 @@ entry_date_str = entry_date.strftime("%Y-%m-%d")
 
 col1, col2 = st.columns([1, 2])
 with col1:
-    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မကြီးမိုးမိုး")
+    cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - တံခွန်တိုင်")
 with col2:
-    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="67.68.78.49.30.23R500\n66.77.88.1000\n4 B 1500", height=130)
+    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="85.3000.r.500\n20@3000\n82.45.10.20.40.50.58.r.250", height=130)
 
 if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     if is_closed:
