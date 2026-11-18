@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 import re
@@ -689,4 +688,3 @@ if not st.session_state.data.empty:
             st.rerun()
 else:
     st.info("📒 ယခုထိ ထည့်ထားသော စာရင်း မရှိသေးပါ။ အထက်ပါ စာရင်းသွင်းကွက်တွင် ရိုက်ထည့်၍ စာရင်းစတင်သွင်းနိုင်ပါသည်။")
-```
