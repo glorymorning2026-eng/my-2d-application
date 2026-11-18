@@ -26,10 +26,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Full Rule Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>📒 မြန်မာနှစ်လုံးထီ (2D) အဆင့်မြင့် အလိုအလျောက် စာရင်းချုပ်စနစ်</h1><p>Master Smart Ledger, Exact Amount Parser & Custom Formula Viber Statement Generator (API-Free)</p></div>', unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များနှင့် ကန့်သတ်ချက်များ")
-max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=50000, step=5000)
+max_limit = st.sidebar.number_input("ဂဏန်းတစ်လုံးလျှင် အများဆုံးလက်ခံငွေ (Limit)", value=500000, step=50000)
 payout_rate = st.sidebar.number_input("ဆုကြေးနှုန်း (ဆ)", value=80, step=5)
 commission_pct = st.sidebar.number_input("ကော်မရှင် (%)", value=10, step=1)
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
@@ -47,7 +47,7 @@ blocked_numbers = [num.strip() for num in blocked_input.split(",") if num.strip(
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=["Date", "Day", "Customer", "BatchID", "Number", "Amount"])
 
-# --- Comprehensive Local 2D Rules Parsing Engine ---
+# --- Comprehensive Local 2D Rules Parsing Engine with Exact Amount Support ---
 def parse_bets_locally(text):
     rows = []
     lines = text.replace("၊", "\n").replace(";", "\n").split("\n")
@@ -123,7 +123,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 7. Thate (ထိပ်စီး)
+        # 7. Thate (ထိပ်စီး) - e.g., 5ထိပ်စီး 20000 or 5ထိပ် 20000
         thate_match = re.search(r'(\d)\s*(ထိပ်စီး|ထိပ်)', line)
         if thate_match:
             t_dig = thate_match.group(1)
@@ -165,7 +165,25 @@ def parse_bets_locally(text):
                     rows.append({"Number": num_str, "Amount": amt})
             continue
 
-        # 10. Multi-number dot/slash/dash list with trailing R and amount (e.g., 48.43.19.35.37.46R2000)
+        # 10. Complex slash/dash list with amounts and R (e.g., 51/52/58-50000r10000 or 51/52/58-50000)
+        complex_match = re.search(r'^([\d\.\-\/\,\s]+)[\-\=](\d+)([Rrရ@&အာ]?)(\d*)$', line)
+        if complex_match:
+            nums_part = complex_match.group(1)
+            base_amt = int(complex_match.group(2))
+            has_r = bool(complex_match.group(3))
+            rev_amt = int(complex_match.group(4)) if complex_match.group(4) else 0
+            
+            raw_nums = re.findall(r'\d{1,2}', nums_part)
+            for n_str in raw_nums:
+                n1 = n_str.zfill(2)
+                rows.append({"Number": n1, "Amount": base_amt})
+                if has_r:
+                    n2 = n1[::-1]
+                    r_val = rev_amt if rev_amt > 0 else base_amt
+                    rows.append({"Number": n2, "Amount": r_val})
+            continue
+
+        # 11. Multi-number with trailing R and amount (e.g., 48.43.19.35.37.46R2000)
         multi_rev = re.search(r'^([\d\.\-\/\,\s]+)\s*([Rrရ@&အာ])\s*(\d+)$', line)
         if multi_rev:
             nums_part = multi_rev.group(1)
@@ -179,7 +197,7 @@ def parse_bets_locally(text):
                     rows.append({"Number": n2, "Amount": amt})
             continue
 
-        # 11. Single Reverse / R (e.g., 45 R 10000)
+        # 12. Single Reverse / R (e.g., 45 R 10000)
         rev_match = re.search(r'(\d{1,2})\s*([Rrရ@&အာ])\s*(\d+)', line)
         if rev_match:
             num1 = rev_match.group(1).zfill(2)
@@ -190,8 +208,8 @@ def parse_bets_locally(text):
                 rows.append({"Number": num2, "Amount": amt})
             continue
             
-        # 12. Multi-number dot/slash/dash list with trailing amount (e.g., 55.66.44.22.11.1000 or 33.99.2500)
-        multi_pairs = re.search(r'^([\d\.\-\/\,\s]+)[\.\-\/\,\s](\d{3,5})$', line)
+        # 13. Multi-number dot/slash/dash list with trailing amount (e.g., 55.66.44.22.11.1000)
+        multi_pairs = re.search(r'^([\d\.\-\/\,\s]+)[\.\-\/\,\s](\d{3,6})$', line)
         if multi_pairs:
             nums_part = multi_pairs.group(1)
             amt = int(multi_pairs.group(2))
@@ -200,13 +218,13 @@ def parse_bets_locally(text):
                 rows.append({"Number": n_str.zfill(2), "Amount": amt})
             continue
 
-        # 13. Direct pairs with separator (e.g., 11 20000, 12-1000)
+        # 14. Direct pairs with separator (e.g., 11 20000, 12-1000)
         pairs = re.findall(r'(\d{1,2})\s*[\-\=\/\_\.\s]\s*(\d+)', line)
         if pairs:
             for num_str, amt_str in pairs:
                 num = num_str.zfill(2)
                 amt = int(amt_str)
-                if 0 <= int(num) <= 99 and 100 <= amt <= 50000:
+                if 0 <= int(num) <= 99 and 100 <= amt <= 500000:
                     rows.append({"Number": num, "Amount": amt})
             continue
             
@@ -235,7 +253,7 @@ def process_and_add_bets(extracted_data, entry_date_str, selected_day, default_c
         amt_val = int(row.get("Amount", 0))
         num_str = str(row.get("Number", "")).zfill(2)
         
-        if amt_val < 100 or amt_val > 50000:
+        if amt_val < 100 or amt_val > 500000:
             invalid_amt_found += 1
             continue
         if num_str in blocked_numbers:
@@ -328,7 +346,6 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
 
     format_sheet(ws_sum, {"A": 42, "B": 24, "C": 38})
 
-    # TAB 2: နေ့အလိုက်_အပတ်စဉ်
     ws_day = wb.create_sheet(title="နေ့အလိုက်_အပတ်စဉ်")
     ws_day["A1"] = "နေ့အလိုက် နှင့် တစ်ပတ်စာ စာရင်းချုပ်"
     ws_day["A1"].font = font_title
@@ -351,7 +368,6 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
             if r_idx % 2 == 1: c.fill = zebra_fill
     format_sheet(ws_day, {"A": 18, "B": 16, "C": 14, "D": 22, "E": 20, "F": 22})
 
-    # TAB 3: ဖောက်သည်အလိုက် ရှင်းတမ်း
     ws_cust = wb.create_sheet(title="ဖောက်သည်အလိုက် ရှင်းတမ်း")
     ws_cust["A1"] = "ဖောက်သည်တစ်ဦးချင်းစီ၏ ရှင်းတမ်း"
     ws_cust["A1"].font = font_title
@@ -380,7 +396,6 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
             if r_idx % 2 == 1: c.fill = zebra_fill
     format_sheet(ws_cust, {"A": 26, "B": 22, "C": 20, "D": 24, "E": 24, "F": 24})
 
-    # TAB 4: ဂဏန်းပေါင်းချုပ်_Limit
     ws_num = wb.create_sheet(title="ဂဏန်းပေါင်းချုပ်_Limit")
     ws_num["A1"] = "ဂဏန်းအလိုက် စုစုပေါင်းနှင့် Limit ထိန်းချုပ်မှု"
     ws_num["A1"].font = font_title
@@ -394,15 +409,12 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
         c_num = ws_num.cell(row=r_idx, column=1, value=str(row.Number).zfill(2))
         c_num.alignment = Alignment(horizontal="center"); c_num.number_format = "@"
         ws_num.cell(row=r_idx, column=2, value=float(row.Amount)).number_format = "#,##0"
-        ws_num.cell(row=r_idx, column=3, value=f"=MIN(B{r_idx},{max_limit})").number_format = "#,##0"
-        ws_num.cell(row=r_idx, column=4, value=f"=B{r_idx}-C{r_idx}").number_format = "#,##0"
+        ws_num.cell(row=r_idx, column=3, value=f"=B{r_idx}").number_format = "#,##0"
+        ws_num.cell(row=r_idx, column=4, value=0).number_format = "#,##0"
         for c_i in range(1, 5):
             c = ws_num.cell(row=r_idx, column=c_i); c.font = font_body; c.border = thin_border
-            if float(row.Amount) > max_limit and c_i == 4:
-                c.fill = loss_fill; c.font = font_bold
     format_sheet(ws_num, {"A": 16, "B": 24, "C": 24, "D": 26})
 
-    # TAB 5: အသေးစိတ်စာရင်း
     ws_det = wb.create_sheet(title="အသေးစိတ်စာရင်း")
     ws_det["A1"] = "အသေးစိတ် စာရင်းမှတ်တမ်း"
     ws_det["A1"].font = font_title
@@ -428,7 +440,7 @@ def generate_styled_excel(df, commission_pct, payout_rate, winning_number, max_l
     wb.save(output)
     return output.getvalue()
 
-st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Detailed Batch Tracker API-Free)")
+st.subheader("📝 စာရင်းသွင်းရန် နည်းလမ်းများ (Exact Amount Tracker API-Free)")
 
 is_closed = False
 if enable_time_lock:
@@ -451,7 +463,7 @@ col1, col2 = st.columns([1, 2])
 with col1:
     cust_manual = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မိုးမိုး")
 with col2:
-    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="48.43.19.35.37.46R2000\n49.01.92.83R1000\n62.17.12.80R1500\n55.66.44.22.11.1000\n33.99.2500\n8 B 2000", height=130)
+    smart_input_text = st.text_area("ဖောက်သည် ပို့လိုက်သော စာရင်းစာသားကို ထည့်ပါ", placeholder="5ထိပ်စီး 20000\n51/52/58-50000r10000", height=130)
 
 if st.button("➕ စာရင်းသွင်းမည်", type="primary"):
     if is_closed:
@@ -568,7 +580,6 @@ if not st.session_state.data.empty:
             
             cust_final_balance = cust_net_pay - cust_win_amt
 
-            # Strict Custom Formula Format: [သိမ့်(1)=သိမ့်(1)၏Total] + [သိမ့်(2)=သိမ့်(2)၏Total] = *(Total ကျပ်)*
             formula_items = [f"[{b[0]}={b[1]:,.0f} ကျပ်]" for b in batch_totals_for_sum]
             formula_string = " + ".join(formula_items) + f" = *({cust_overall_total:,.0f} ကျပ်)*"
 
@@ -577,7 +588,7 @@ if not st.session_state.data.empty:
             cust_viber_lines.append(f"ကော်မရှင် ({commission_pct}%) = -{cust_comm:,.0f} ကျပ်")
             cust_viber_lines.append(f"ပေးချေရန် Net = {cust_net_pay:,.0f} ကျပ်")
             if winning_number:
-                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_num_clean}) = +{cust_win_amt:,.0f} ကျပ်")
+                cust_viber_lines.append(f"ပေါက်ဂဏန်းဆုကြေး ({win_clean}) = +{cust_win_amt:,.0f} ကျပ်")
                 bal_label = "ပေးရန် (+) / ရရန် (-)" if cust_final_balance >= 0 else "ရရန်"
                 cust_viber_lines.append(f"ရှင်းတမ်းစုစုပေါင်း ({bal_label}) = {cust_final_balance:,.0f} ကျပ်")
 
@@ -589,8 +600,8 @@ if not st.session_state.data.empty:
     with col_left:
         st.subheader("📊 ဂဏန်းအလိုက် စုစုပေါင်းနှင့် ကန့်သတ်ချက် (Limit Control)")
         grouped = df.groupby("Number")["Amount"].sum().reset_index().sort_values(by="Amount", ascending=False)
-        grouped["Allowed"] = grouped["Amount"].apply(lambda x: min(x, max_limit))
-        grouped["Excess"] = grouped["Amount"] - grouped["Allowed"]
+        grouped["Allowed"] = grouped["Amount"]
+        grouped["Excess"] = 0
         st.dataframe(grouped, use_container_width=True)
         
     with col_right:
