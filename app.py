@@ -1249,4 +1249,3 @@ if not st.session_state.data.empty:
 
 else:
     st.info("စာရင်းမရှိသေးပါ။ အထက်တွင် စတင်သွင်းပါ။")
-```eof
