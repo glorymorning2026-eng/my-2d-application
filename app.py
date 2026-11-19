@@ -144,15 +144,18 @@ def parse_line(raw_line):
     if not line:
         return rows, warns
 
-    # 0. အစက်ခြား ထိပ် / ထိတ် နှင့် .r. ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ထိပ်.2000.r.500)
+    # 0A. Dot/separator head with @/R reverse (e.g., 4.ထိပ်.2000.r.500)
     thate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr][\.\-\_\s]*(\d+)",
+        r"(\d)[\s\.\-\/]+(?:ထိပ်စီး|ထိပ်|ထိတ်)[\s\.\-\/]+(\d+)[\s\.\-\/]*[\@Rr][\s\.\-\/]*(\d+)",
         line,
         re.I,
     )
     if thate_dot_rev:
         dig = thate_dot_rev.group(1)
-        amt_front, amt_back = int(thate_dot_rev.group(2)), int(thate_dot_rev.group(3))
+        amt_front, amt_back = (
+            int(thate_dot_rev.group(2)),
+            int(thate_dot_rev.group(3)),
+        )
         for i in range(10):
             add_number(
                 rows,
@@ -171,15 +174,18 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 0b. အစက်ခြား ပိတ် နှင့် .r. ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ပိတ်.2000.r.500)
+    # 0B. Dot/separator pate with @/R reverse (e.g., 4.ပိတ်.2000.r.500)
     pate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr][\.\-\_\s]*(\d+)",
+        r"(\d)[\s\.\-\/]+(?:နောက်ပိတ်|ပိတ်)[\s\.\-\/]+(\d+)[\s\.\-\/]*[\@Rr][\s\.\-\/]*(\d+)",
         line,
         re.I,
     )
     if pate_dot_rev:
         dig = pate_dot_rev.group(1)
-        amt_back, amt_front = int(pate_dot_rev.group(2)), int(pate_dot_rev.group(3))
+        amt_back, amt_front = (
+            int(pate_dot_rev.group(2)),
+            int(pate_dot_rev.group(3)),
+        )
         for i in range(10):
             add_number(
                 rows,
@@ -332,19 +338,36 @@ def parse_line(raw_line):
                 add_number(rows, n, amt, category="r_pat", desc=desc_str)
         return rows, warns
 
-    # 9. ပါတ် / ပတ် / ပက်
-    pa = re.search(r"(\d)\s*(ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ူး)", line)
+    # 9. ပါတ် / ပတ် / ပက် (supports single digit or multi-digit/dot-separated like 9.4.ပတ်.500 and optional အပူးပါ/အပူးအပါ/ပူးပါ/ပူးအပါ)
+    pa = re.search(
+        r"((?:\d[\s\.\-\/]*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ူး)", line
+    )
     if pa:
-        digit = pa.group(1)
+        raw_digits_part = pa.group(1)
+        digits_list = []
+        for d in re.findall(r"\d", raw_digits_part):
+            if d not in digits_list:
+                digits_list.append(d)
         amt = get_amount(line)
-        for n in _pat_for_digit(digit):
-            add_number(
-                rows,
-                n,
-                amt,
-                category="r_pat",
-                desc=f"{digit} ပတ် (၁၉ ကွက် × {amt:,})",
+        inc_double = bool(re.search(r"အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ", line))
+
+        for digit in digits_list:
+            desc_str = (
+                f"{digit} ပတ် အပူးပါ ({amt:,})"
+                if inc_double
+                else f"{digit} ပတ် (၁၉ ကွက် × {amt:,})"
             )
+            for n in _pat_for_digit(digit):
+                add_number(rows, n, amt, category="r_pat", desc=desc_str)
+            if inc_double:
+                double_num = f"{digit}{digit}"
+                add_number(
+                    rows,
+                    double_num,
+                    amt,
+                    category="r_pat",
+                    desc=f"{digit} ပတ် အပူးထပ်ဆောင်း ({double_num} = {amt:,})",
+                )
         return rows, warns
 
     # 10. ထိပ် / ထိတ်
@@ -486,54 +509,47 @@ def split_mixed_line(raw_line):
     if "နေ့ရှင်း" in line:
         return [line]
 
-    # Split mixed lines containing special patterns (bk/break/pat/khve/thate/pate/r/@)
-    # joined by '/', '*', '=', or whitespace while preserving per-segment amounts.
-    if re.search(
-        r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်|[\@Rr])", line, re.I
-    ) and re.search(r"[/*=]", line):
-        # First split on '*' or explicit boundary transitions before keywords/numbers
-        # Example: 5bk/7bk250/99=1000/33/11=500*9ပတ်150tt 99*250
-        raw_parts = re.split(r"\*+", line)
-        segments = []
+    has_special_kw = bool(
+        re.search(
+            r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်)", line, re.I
+        )
+    )
+    if has_special_kw and ("=" in line or "*" in line):
+        raw_parts = re.split(r"[/*]+", line)
+        expanded = []
+        last_amt = None
         for part in raw_parts:
-            part = part.strip(" /")
-            if not part:
+            p = part.strip()
+            if not p:
                 continue
-            # If a part has multiple '=' or '/' chained bets like 99=1000/33/11=500 or 5bk/7bk250
-            # Split before a new standalone token/pattern that starts after a completed amount
-            sub_parts = re.split(
-                r"(?<=\d)(?=(?:\d{1,2}\s*[=]|[0-9]\s*(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်)|\s+\d{1,2}\s*\*))",
-                part,
-                flags=re.I,
-            )
-            for sp in sub_parts:
-                sp_clean = sp.strip(" /*")
-                if sp_clean:
-                    # Handle chained slash groups like "33/11=500" or "5bk/7bk250"
-                    if "/" in sp_clean and ("=" in sp_clean or re.search(r"(?:bk|ဘရိတ်|B)", sp_clean, re.I)):
-                        slash_tokens = [t.strip() for t in sp_clean.split("/") if t.strip()]
-                        # Propagate trailing amount/pattern if present on the last token
-                        last_tok = slash_tokens[-1]
-                        amt_tail = re.search(r"(?:=|(?<![a-zA-Z])(?:bk|ဘရိတ်|B))\s*(\d+(?:,\d+)*(?:tt)?)$", last_tok, re.I)
-                        shared_suffix = ""
-                        if amt_tail:
-                            val_str = amt_tail.group(1)
-                            if "=" in last_tok:
-                                shared_suffix = f"={val_str}"
-                            elif re.search(r"(?:bk|ဘရိတ်|B)", last_tok, re.I):
-                                shared_suffix = f" {val_str}"
+            m_eq = re.fullmatch(r"(\d{1,2})\s*=\s*(\d+)", p)
+            if m_eq:
+                expanded.append(f"{m_eq.group(1)}.{m_eq.group(2)}")
+                last_amt = m_eq.group(2)
+                continue
+            m_star = re.fullmatch(r"(\d{1,2})\s*\*\s*(\d+)", p)
+            if m_star:
+                expanded.append(f"{m_star.group(1)}.{m_star.group(2)}")
+                last_amt = m_star.group(2)
+                continue
+            m_bk_no_amt = re.fullmatch(r"(\d)\s*(bk|ဘရိတ်|B)", p, re.I)
+            if m_bk_no_amt:
+                expanded.append(p)
+                continue
+            m_amt_end = re.search(r"(\d+)(?:tt)?$", p, re.I)
+            if m_amt_end:
+                last_amt = m_amt_end.group(1)
+            expanded.append(p)
 
-                        for idx_t, tok in enumerate(slash_tokens):
-                            if idx_t < len(slash_tokens) - 1 and shared_suffix:
-                                # Only attach shared suffix if token doesn't already specify an amount/keyword
-                                if not re.search(r"(?:=|[*]|(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်)\s*\d)", tok, re.I):
-                                    tok = f"{tok}{shared_suffix}"
-                            segments.append(tok)
-                    else:
-                        segments.append(sp_clean)
-
-        if len(segments) > 1:
-            return segments
+        if last_amt:
+            final_parts = []
+            for item in expanded:
+                if re.fullmatch(r"\d\s*(?:bk|ဘရိတ်|B)", item, re.I):
+                    final_parts.append(f"{item}{last_amt}")
+                else:
+                    final_parts.append(item)
+            return final_parts
+        return expanded
 
     return [line]
 
@@ -903,7 +919,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="61.2000R1000\n90.2000@.500\n40_2000@500\n4ထိတ်1000@500\n23.r500tt..\nအပူး500\n25@1000",
+        placeholder="9.4.ပတ်.500\n9ပတ်500အပူးပါ\n4.ထိပ်.2000.r.500\n61.2000R1000\n90.2000@.500",
         height=180,
     )
 
@@ -1233,3 +1249,4 @@ if not st.session_state.data.empty:
 
 else:
     st.info("စာရင်းမရှိသေးပါ။ အထက်တွင် စတင်သွင်းပါ။")
+```eof
