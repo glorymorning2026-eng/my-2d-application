@@ -310,15 +310,23 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 8. BK / ဘရိတ် / B (supports single or multiple digits like "3 5 B 1500" or "5bk")
-    bk_matches = re.findall(r"(\d)\s*(?:ဘရိတ်|bk|B)(?![a-zA-Z])", line, re.IGNORECASE)
-    if bk_matches:
-        _, amts = extract_numbers_and_amounts(line)
+    # 8. BK / ဘရိတ် / B (captures ALL digits before BK/B, e.g., "3 5 B 1500" -> 3 bk & 5 bk)
+    m_bk = re.search(
+        r"((?:\d\s*)+)\s*(?:ဘရိတ်|bk|B)(?![a-zA-Z])(.*)", line, re.IGNORECASE
+    )
+    if m_bk:
+        bk_digits_raw = m_bk.group(1)
+        tail = m_bk.group(2)
+        _, amts = extract_numbers_and_amounts(tail)
+        if not amts:
+            _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
+
         bk_digits = []
-        for d in bk_matches:
+        for d in re.findall(r"\d", bk_digits_raw):
             if d not in bk_digits:
                 bk_digits.append(d)
+
         label = " / ".join(f"{d} bk" for d in bk_digits)
         desc_str = f"{label} (ဘရိတ်ဂဏန်း {len(bk_digits)} ခု × {amt:,})"
         for d in bk_digits:
@@ -370,7 +378,6 @@ def parse_line(raw_line):
         _, right_amts = extract_numbers_and_amounts(parts[1])
 
         if not left_nums and left_amts:
-            # Handle typo like "4000r2000" where first token is 4 digits
             first_str = str(left_amts[0])
             if len(first_str) >= 2:
                 left_nums = [first_str[:2]]
