@@ -28,7 +28,7 @@ st.markdown(
     """
 <div class="main-header">
 <h1>📒 မြန်မာ 2D Master Dealer App</h1>
-<p>Unified Precision Parser • Preview & Edit • Warning System • Viber Statement • Excel Export</p>
+<p>Clean &amp; Accurate Parser • Preview &amp; Edit • Warning System • Viber Statement • Excel Export</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -98,168 +98,149 @@ if st.session_state.flash_warning:
 
 
 # =========================================================
-# PARSER HELPERS
+# CLEAN PARSER HELPERS
 # =========================================================
-def add_number(rows, number, amount, is_default=False, category="main", desc=""):
-    n = str(number).zfill(2)
-    if len(n) == 2 and n.isdigit() and 0 <= int(n) <= 99:
+MIN_BET_AMOUNT = 100
+MAX_BET_AMOUNT = 500000
+DOUBLE_INCLUDE_RE = re.compile(r"အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ")
+REV_MARKER_RE = re.compile(r"[@Rr&]")
+
+
+def add_bet(rows, number, amount, category="main", desc="", is_default=False):
+    n = str(number).strip().zfill(2)
+    amt = int(amount)
+    if len(n) == 2 and n.isdigit() and 0 <= int(n) <= 99 and amt >= MIN_BET_AMOUNT:
         rows.append({
             "Number": n,
-            "Amount": int(amount),
+            "Amount": amt,
             "_default": is_default,
             "Category": category,
-            "Description": desc,
+            "Description": desc or n,
         })
         return True
     return False
 
 
-def get_amount(text):
-    """Extracts the last number in a string as the amount."""
-    matches = re.findall(r"(\d+(?:,\d+)*)(?:tt)?", text, re.IGNORECASE)
-    if matches:
-        return int(matches[-1].replace(",", ""))
-    return 1000
+def clean_noise(text):
+    """Remove trailing units/noise and normalize punctuation separators to spaces."""
+    s = text.strip()
+    s = re.sub(r"(?:tt|ks|mmk|ကျပ်)+$", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"[./,;_]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
 
-def _bk_for_digit(digit):
+def extract_numbers_and_amounts(text):
+    """
+    Clean rule:
+    - 2-digit numbers (00-99) are treated as bet numbers.
+    - Numbers >= 100 are treated as stake amounts.
+    Returns (two_digit_nums, amounts_list).
+    """
+    nums = []
+    amounts = []
+    for tok in re.findall(r"\d+", text):
+        val = int(tok)
+        if len(tok) <= 2 and 0 <= val <= 99:
+            nums.append(tok.zfill(2))
+        elif val >= MIN_BET_AMOUNT:
+            amounts.append(val)
+    return nums, amounts
+
+
+def _bk_numbers(digit):
     d = int(digit)
     return [f"{i:02d}" for i in range(100) if (i // 10 + i % 10) % 10 == d]
 
 
-def _pat_for_digit(digit):
+def _pat_numbers(digit):
     return [f"{i:02d}" for i in range(100) if digit in f"{i:02d}"]
 
 
 # =========================================================
-# UNIFIED LINE PARSER (COMBINED CORE LOGIC)
+# LINE PARSER (CLEAR & DETERMINISTIC)
 # =========================================================
 def parse_line(raw_line):
     rows = []
     warns = []
 
-    line = re.sub(
-        r"(?:tt|ks|mmk|ကျပ်|\.)+$", "", raw_line.strip(), flags=re.IGNORECASE
-    ).strip()
+    line = clean_noise(raw_line)
     if not line:
         return rows, warns
 
-    # 0. အစက်ခြား ထိပ် / ထိတ် နှင့် .r. / @ / & ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ထိပ်.2000.r.500)
-    thate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr&][\.\-\_\s]*(\d+)",
-        line,
-        re.I,
-    )
-    if thate_dot_rev:
-        dig = thate_dot_rev.group(1)
-        amt_front, amt_back = int(thate_dot_rev.group(2)), int(thate_dot_rev.group(3))
+    # 1. ထိပ် / ထိတ် (with optional reverse amount after R/r/@/&: e.g. 4 ထိပ် 2000 r 500 or 4 ထိပ် 1000)
+    m_thate = re.search(r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(.*)", line, re.IGNORECASE)
+    if m_thate:
+        dig = m_thate.group(1)
+        tail = m_thate.group(2)
+        rev_parts = REV_MARKER_RE.split(tail, maxsplit=1)
+        _, front_amts = extract_numbers_and_amounts(rev_parts[0])
+        amt_front = front_amts[-1] if front_amts else 1000
+
         for i in range(10):
-            add_number(
+            add_bet(
                 rows,
                 f"{dig}{i}",
                 amt_front,
                 category="r_pat",
                 desc=f"{dig} ထိပ် (၁၀ ကွက် × {amt_front:,})",
             )
-        for i in range(10):
-            add_number(
-                rows,
-                f"{i}{dig}",
-                amt_back,
-                category="r_pat",
-                desc=f"{dig} ပိတ် (၁၀ ကွက် × {amt_back:,})",
-            )
+
+        if len(rev_parts) == 2:
+            _, back_amts = extract_numbers_and_amounts(rev_parts[1])
+            amt_back = back_amts[-1] if back_amts else amt_front
+            for i in range(10):
+                add_bet(
+                    rows,
+                    f"{i}{dig}",
+                    amt_back,
+                    category="r_pat",
+                    desc=f"{dig} ပိတ် ပြောင်းပြန် (၁၀ ကွက် × {amt_back:,})",
+                )
         return rows, warns
 
-    # 0b. အစက်ခြား ပိတ် နှင့် .r. / @ / & ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ပိတ်.2000.r.500)
-    pate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr&][\.\-\_\s]*(\d+)",
-        line,
-        re.I,
-    )
-    if pate_dot_rev:
-        dig = pate_dot_rev.group(1)
-        amt_back, amt_front = int(pate_dot_rev.group(2)), int(pate_dot_rev.group(3))
-        for i in range(10):
-            add_number(
-                rows,
-                f"{i}{dig}",
-                amt_back,
-                category="r_pat",
-                desc=f"{dig} ပိတ် (၁၀ ကွက် × {amt_back:,})",
-            )
-        for i in range(10):
-            add_number(
-                rows,
-                f"{dig}{i}",
-                amt_front,
-                category="r_pat",
-                desc=f"{dig} ထိပ် (၁၀ ကွက် × {amt_front:,})",
-            )
-        return rows, warns
+    # 2. နောက်ပိတ် / ပိတ် (with optional reverse amount after R/r/@/&: e.g. 4 ပိတ် 1000 or 4 ပိတ် 1000 @ 500)
+    m_pate = re.search(r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(.*)", line, re.IGNORECASE)
+    if m_pate:
+        dig = m_pate.group(1)
+        tail = m_pate.group(2)
+        rev_parts = REV_MARKER_RE.split(tail, maxsplit=1)
+        _, back_amts = extract_numbers_and_amounts(rev_parts[0])
+        amt_back = back_amts[-1] if back_amts else 1000
 
-    # 1. ထိပ် / ထိတ် နှင့် @/R/& ပြောင်းပြန်တွဲလျက်
-    thate_rev = re.fullmatch(
-        r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(\d+)\s*[\@Rr&]\.?\s*(\d+)",
-        line,
-        re.I,
-    )
-    if thate_rev:
-        dig = thate_rev.group(1)
-        amt_front, amt_back = int(thate_rev.group(2)), int(thate_rev.group(3))
         for i in range(10):
-            add_number(
-                rows,
-                f"{dig}{i}",
-                amt_front,
-                category="r_pat",
-                desc=f"{dig} ထိပ် (၁၀ ကွက် × {amt_front:,})",
-            )
-        for i in range(10):
-            add_number(
+            add_bet(
                 rows,
                 f"{i}{dig}",
                 amt_back,
                 category="r_pat",
                 desc=f"{dig} ပိတ် (၁၀ ကွက် × {amt_back:,})",
             )
-        return rows, warns
 
-    # 2. ပိတ် နှင့် @/R/& ပြောင်းပြန်တွဲလျက်
-    pate_rev = re.fullmatch(
-        r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(\d+)\s*[\@Rr&]\.?\s*(\d+)", line, re.I
-    )
-    if pate_rev:
-        dig = pate_rev.group(1)
-        amt_back, amt_front = int(pate_rev.group(2)), int(pate_rev.group(3))
-        for i in range(10):
-            add_number(
-                rows,
-                f"{i}{dig}",
-                amt_back,
-                category="r_pat",
-                desc=f"{dig} ပိတ် (၁၀ ကွက် × {amt_back:,})",
-            )
-        for i in range(10):
-            add_number(
-                rows,
-                f"{dig}{i}",
-                amt_front,
-                category="r_pat",
-                desc=f"{dig} ထိပ် (၁၀ ကွက် × {amt_front:,})",
-            )
+        if len(rev_parts) == 2:
+            _, front_amts = extract_numbers_and_amounts(rev_parts[1])
+            amt_front = front_amts[-1] if front_amts else amt_back
+            for i in range(10):
+                add_bet(
+                    rows,
+                    f"{dig}{i}",
+                    amt_front,
+                    category="r_pat",
+                    desc=f"{dig} ထိပ် ပြောင်းပြန် (၁၀ ကွက် × {amt_front:,})",
+                )
         return rows, warns
 
     # 3. ညီအကို / ညီကို
     if re.search(r"ညီအကို|ညီကို", line):
-        amt = get_amount(line)
+        _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
         pairs = ["01", "12", "23", "34", "45", "56", "67", "78", "89", "90"]
         added = set()
         for n in pairs:
             for item in (n, n[::-1]):
                 if item not in added:
                     added.add(item)
-                    add_number(
+                    add_bet(
                         rows,
                         item,
                         amt,
@@ -268,11 +249,12 @@ def parse_line(raw_line):
                     )
         return rows, warns
 
-    # 4. အပူး / ပူး
+    # 4. အပူး / ပူး (standalone double bet, excluding ခွေ)
     if re.search(r"အပူ|ပူး", line) and not re.search(r"ခွေ", line):
-        amt = get_amount(line)
+        _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
         for i in range(10):
-            add_number(
+            add_bet(
                 rows,
                 f"{i}{i}",
                 amt,
@@ -283,295 +265,211 @@ def parse_line(raw_line):
 
     # 5. နက္ခတ်
     if "နက္ခတ်" in line:
-        amt = get_amount(line)
+        _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
         for n in ["07", "70", "18", "81", "24", "42", "35", "53", "69", "96"]:
-            add_number(
+            add_bet(
                 rows, n, amt, category="r_pat", desc=f"နက္ခတ် (၁၀ ကွက် × {amt:,})"
             )
         return rows, warns
 
-    # 6. ပါဝါ
-    if re.search(r"ပါဝါ|power", line, re.I):
-        amt = get_amount(line)
+    # 6. ပါဝါ / power
+    if re.search(r"ပါဝါ|power", line, re.IGNORECASE):
+        _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
         for n in ["05", "50", "16", "61", "27", "72", "38", "83", "49", "94"]:
-            add_number(
+            add_bet(
                 rows, n, amt, category="r_pat", desc=f"ပါဝါ (၁၀ ကွက် × {amt:,})"
             )
         return rows, warns
 
-    # 7. ခွေ (ဥပမာ - 234ခွေပူးပါ2500 သို့မဟုတ် 234ခွေ2500)
-    kh = re.search(r"(\d{2,6})\s*(?:ခွေ|အခွေ)", line)
-    if kh:
-        digits = kh.group(1)
-        amt = get_amount(line)
-        inc = bool(re.search(r"အပူးပါ|ပူးပါ|အပူးအပါ|ပူးအပါ", line))
+    # 7. ခွေ / အခွေ
+    m_khve = re.search(r"(\d{2,6})\s*(?:အခွေ|ခွေ)(.*)", line)
+    if m_khve:
+        digits = m_khve.group(1)
+        tail = m_khve.group(2)
+        _, amts = extract_numbers_and_amounts(tail)
+        amt = amts[-1] if amts else 1000
+        inc_double = bool(DOUBLE_INCLUDE_RE.search(line))
         combos = (
-            list(product(set(digits), repeat=2))
-            if inc
-            else list(permutations(digits, 2))
+            product(set(digits), repeat=2)
+            if inc_double
+            else permutations(digits, 2)
         )
         added = set()
         for p in combos:
             n = "".join(p)
             if n not in added:
                 added.add(n)
-                add_number(
+                add_bet(
                     rows,
                     n,
                     amt,
                     category="r_pat",
-                    desc=f"{digits} ခွေ{' (ပူးပါ)' if inc else ''} ({amt:,})",
+                    desc=f"{digits} ခွေ{' (ပူးပါ)' if inc_double else ''} ({amt:,})",
                 )
         return rows, warns
 
-    # 8. BK / ဘရိတ် (ဥပမာ - 3.5 B 1500 သို့မဟုတ် 5bk/7bk250)
-    bks = re.findall(r"(\d)\s*(?:bk|ဘရိတ်|B)(?![a-zA-Z])", line, re.I)
-    if not bks and re.search(r"(?:bk|ဘရိတ်|(?<![a-zA-Z])B(?![a-zA-Z]))", line, re.I):
-        bk_prefix = re.split(
-            r"(?:bk|ဘရိတ်|(?<![a-zA-Z])B(?![a-zA-Z]))",
-            line,
-            maxsplit=1,
-            flags=re.I,
-        )[0]
-        bks = [(d, "B") for d in re.findall(r"\d", bk_prefix)]
-
-    if bks:
-        amt = get_amount(line)
+    # 8. BK / ဘရိတ် / B (supports single or multiple digits like "3 5 B 1500" or "5bk")
+    bk_matches = re.findall(r"(\d)\s*(?:ဘရိတ်|bk|B)(?![a-zA-Z])", line, re.IGNORECASE)
+    if bk_matches:
+        _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
         bk_digits = []
-        for m in bks:
-            d_val = m[0] if isinstance(m, tuple) else m
-            if d_val not in bk_digits:
-                bk_digits.append(d_val)
-        label = " / ".join([f"{d} B" for d in bk_digits])
+        for d in bk_matches:
+            if d not in bk_digits:
+                bk_digits.append(d)
+        label = " / ".join(f"{d} bk" for d in bk_digits)
         desc_str = f"{label} (ဘရိတ်ဂဏန်း {len(bk_digits)} ခု × {amt:,})"
         for d in bk_digits:
-            for n in _bk_for_digit(d):
-                add_number(rows, n, amt, category="r_pat", desc=desc_str)
+            for n in _bk_numbers(d):
+                add_bet(rows, n, amt, category="r_pat", desc=desc_str)
         return rows, warns
 
-    # 9. ပါတ် / ပတ် / ပက် (ဥပမာ - 9.4.ပတ်.500 နှင့် အပူးပါ/အပူးအပါ/ပူးပါ/ပူးအပါ)
-    pa = re.search(
-        r"((?:\d[\s\.\-\/]*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ(?!ိတ်|ူး))", line
+    # 9. ပတ် / ပါတ် / ပက် / ပါ / ပ (strictly NOT ပိတ်, supports multi-digit like "9 4 ပတ် 500" and double inclusion)
+    m_pat = re.search(
+        r"((?:\d\s*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ိတ်|ူး)(.*)", line
     )
-    if pa:
-        raw_digits_part = pa.group(1)
-        digits_list = []
-        for d in re.findall(r"\d", raw_digits_part):
-            if d not in digits_list:
-                digits_list.append(d)
-        amt = get_amount(line)
-        inc_double = bool(re.search(r"အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ", line))
+    if m_pat:
+        pat_digits_raw = m_pat.group(1)
+        tail = m_pat.group(2)
+        _, amts = extract_numbers_and_amounts(tail)
+        if not amts:
+            _, amts = extract_numbers_and_amounts(line)
+        amt = amts[-1] if amts else 1000
+        inc_double = bool(DOUBLE_INCLUDE_RE.search(line))
 
-        for digit in digits_list:
+        pat_digits = []
+        for d in re.findall(r"\d", pat_digits_raw):
+            if d not in pat_digits:
+                pat_digits.append(d)
+
+        for d in pat_digits:
             desc_str = (
-                f"{digit} ပတ် အပူးပါ ({amt:,})"
+                f"{d} ပတ် အပူးပါ ({amt:,})"
                 if inc_double
-                else f"{digit} ပတ် (၁၉ ကွက် × {amt:,})"
+                else f"{d} ပတ် (၁၉ ကွက် × {amt:,})"
             )
-            for n in _pat_for_digit(digit):
-                add_number(rows, n, amt, category="r_pat", desc=desc_str)
+            for n in _pat_numbers(d):
+                add_bet(rows, n, amt, category="r_pat", desc=desc_str)
             if inc_double:
-                double_num = f"{digit}{digit}"
-                add_number(
+                dbl = f"{d}{d}"
+                add_bet(
                     rows,
-                    double_num,
+                    dbl,
                     amt,
                     category="r_pat",
-                    desc=f"{digit} ပတ် အပူးထပ်ဆောင်း ({double_num} = {amt:,})",
+                    desc=f"{d} ပတ် အပူးထပ်ဆောင်း ({dbl} = {amt:,})",
                 )
         return rows, warns
 
-    # 10. ထိပ် / ထိတ် (R/r/@/& မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
-    th = re.search(r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)", line)
-    if th:
-        digit = th.group(1)
-        amt = get_amount(line)
-        for i in range(10):
-            add_number(
-                rows,
-                f"{digit}{i}",
-                amt,
-                category="r_pat",
-                desc=f"{digit} ထိပ် (၁၀ ကွက် × {amt:,})",
-            )
-        return rows, warns
+    # 10. Reverse markers (R / r / @ / &): e.g. 61 2000 R 1000, 46 96 r 1500, 19 46 & 2000, 90 2000 @ 500
+    if REV_MARKER_RE.search(line):
+        parts = REV_MARKER_RE.split(line, maxsplit=1)
+        left_nums, left_amts = extract_numbers_and_amounts(parts[0])
+        _, right_amts = extract_numbers_and_amounts(parts[1])
 
-    # 11. ပိတ် (R/r/@/& မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
-    pt = re.search(r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)", line)
-    if pt:
-        digit = pt.group(1)
-        amt = get_amount(line)
-        for i in range(10):
-            add_number(
-                rows,
-                f"{i}{digit}",
-                amt,
-                category="r_pat",
-                desc=f"{digit} ပိတ် (၁၀ ကွက် × {amt:,})",
-            )
-        return rows, warns
+        if not left_nums and left_amts:
+            # Handle typo like "4000r2000" where first token is 4 digits
+            first_str = str(left_amts[0])
+            if len(first_str) >= 2:
+                left_nums = [first_str[:2]]
+                left_amts = [int(first_str)]
+                warns.append(f"Assumed '{line}' → {left_nums[0]}={left_amts[0]}")
 
-    # 12. R, @ သို့မဟုတ် & ပါဝင်သော ပြောင်းပြန် (Reverse) ပုံစံအားလုံး
-    if re.search(r"[\@Rr&]", line):
-        typo = re.fullmatch(r"(\d{4})[\@Rr&]\.?(\d+)", line)
-        if typo:
-            num = typo.group(1)[:2]
-            base_amt = int(typo.group(1))
-            rev_amt = int(typo.group(2))
-            add_number(
-                rows,
-                num,
-                base_amt,
-                category="r_pat",
-                desc=f"{num} R ({base_amt:,}/{rev_amt:,})",
-            )
-            if num != num[::-1]:
-                add_number(
-                    rows,
-                    num[::-1],
-                    rev_amt,
-                    category="r_pat",
-                    desc=f"{num} R ({base_amt:,}/{rev_amt:,})",
-                )
-            warns.append(
-                f"Ambiguous '{line}' → assumed {num}={base_amt}, {num[::-1]}={rev_amt}"
-            )
-            return rows, warns
+        rev_amt = right_amts[-1] if right_amts else (left_amts[-1] if left_amts else None)
+        base_amt = left_amts[-1] if left_amts else rev_amt
 
-        parts = re.split(r"[\.\-\_\s]*[\@Rr&][\.\-\_\s]*", line, maxsplit=1)
-        if len(parts) == 2:
-            left, right = parts
-            rev_amt = get_amount(right)
-            tokens = [t for t in re.split(r"[^\d]+", left) if t]
-
-            base_amt = None
-            nums = []
-            for t in tokens:
-                if len(t) <= 2:
-                    nums.append(t.zfill(2))
-                elif int(t) >= 100:
-                    base_amt = int(t)
-
-            if base_amt is None:
-                base_amt = rev_amt
-
-            num_label = " / ".join(nums)
-            total_k = sum([2 if n != n[::-1] else 1 for n in nums])
+        if left_nums and base_amt is not None and rev_amt is not None:
+            num_label = " / ".join(left_nums)
+            total_k = sum(2 if n != n[::-1] else 1 for n in left_nums)
             desc_str = (
                 f"{num_label} R ({total_k} ကွက် × {rev_amt:,})"
                 if base_amt == rev_amt
                 else f"{num_label} R ({base_amt:,} / {rev_amt:,})"
             )
-
-            for n in nums:
-                add_number(rows, n, base_amt, category="r_pat", desc=desc_str)
+            for n in left_nums:
+                add_bet(rows, n, base_amt, category="r_pat", desc=desc_str)
                 if n != n[::-1]:
-                    add_number(
-                        rows, n[::-1], rev_amt, category="r_pat", desc=desc_str
-                    )
-
-            if not nums and tokens:
-                warns.append(f"Could not extract numbers from '{left}'")
+                    add_bet(rows, n[::-1], rev_amt, category="r_pat", desc=desc_str)
             return rows, warns
 
-    # 13. Universal Rule: ဂဏန်း ၂ လုံးများ + 100 နှင့်အထက် ထိုးကြေးငွေ (22-7500 စသည်)
-    tokens = [t for t in re.split(r"[^\d]+", line) if t]
-    if tokens:
-        nums = []
-        amt = None
-        for t in tokens:
-            if len(t) <= 2:
-                nums.append(t.zfill(2))
-            elif int(t) >= 100:
-                amt = int(t)
+        warns.append(f"Could not parse reverse line: '{raw_line.strip()}'")
+        return rows, warns
 
-        if nums and amt is not None:
-            num_label = ", ".join(nums)
-            desc_str = (
-                f"{num_label} (တစ်ကွက် {amt:,})"
-                if len(nums) > 1
-                else f"{num_label}"
+    # 11. Standard 2-digit numbers + stake amount (>= 100)
+    nums, amts = extract_numbers_and_amounts(line)
+    if nums and amts:
+        amt = amts[-1]
+        num_label = ", ".join(nums)
+        desc_str = f"{num_label} (တစ်ကွက် {amt:,})" if len(nums) > 1 else num_label
+        for n in nums:
+            add_bet(rows, n, amt, category="main", desc=desc_str)
+        return rows, warns
+
+    # Standalone 2-digit numbers without amount (wait for နေ့ရှင်း or default)
+    if nums and not amts and re.fullmatch(r"[\d\s\-]+", line):
+        num_label = ", ".join(nums)
+        for n in nums:
+            add_bet(
+                rows,
+                n,
+                1000,
+                category="main",
+                desc=f"{num_label} (ထပ်ဆောင်း)",
+                is_default=True,
             )
-            for n in nums:
-                add_number(rows, n, amt, category="main", desc=desc_str)
-            return rows, warns
-        elif nums and amt is None and re.fullmatch(r"[\d\s.,/-]+", line):
-            num_label = ", ".join(nums)
-            for n in nums:
-                add_number(
-                    rows,
-                    n,
-                    1000,
-                    is_default=True,
-                    category="main",
-                    desc=f"{num_label} (ထပ်ဆောင်း)",
-                )
-            return rows, warns
+        return rows, warns
 
-    warns.append(f"Unrecognized: '{line}'")
+    warns.append(f"Unrecognized: '{raw_line.strip()}'")
     return rows, warns
 
 
 # =========================================================
-# MAIN PARSER LOOP
+# MIXED LINE SPLITTER & MAIN PARSER
 # =========================================================
 def split_mixed_line(raw_line):
     line = raw_line.strip()
     if "နေ့ရှင်း" in line:
         return [line]
 
-    if re.search(
-        r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်|[\@Rr&])", line, re.I
-    ) and re.search(r"[/*=]", line):
-        raw_parts = re.split(r"\*+", line)
-        segments = []
+    has_kw = bool(
+        re.search(r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်)", line, re.IGNORECASE)
+    )
+    if has_kw and ("=" in line or "*" in line):
+        raw_parts = re.split(r"[/*]+", line)
+        expanded = []
+        last_amt = None
         for part in raw_parts:
-            part = part.strip(" /")
-            if not part:
+            p = part.strip()
+            if not p:
                 continue
-            sub_parts = re.split(
-                r"(?<=\d)(?=(?:\d{1,2}\s*[=]|[0-9]\s*(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်)|\s+\d{1,2}\s*\*))",
-                part,
-                flags=re.I,
-            )
-            for sp in sub_parts:
-                sp_clean = sp.strip(" /*")
-                if sp_clean:
-                    if "/" in sp_clean and (
-                        "=" in sp_clean
-                        or re.search(r"(?:bk|ဘရိတ်|B)", sp_clean, re.I)
-                    ):
-                        slash_tokens = [
-                            t.strip() for t in sp_clean.split("/") if t.strip()
-                        ]
-                        last_tok = slash_tokens[-1]
-                        amt_tail = re.search(
-                            r"(?:=|(?<![a-zA-Z])(?:bk|ဘရိတ်|B))\s*(\d+(?:,\d+)*(?:tt)?)$",
-                            last_tok,
-                            re.I,
-                        )
-                        shared_suffix = ""
-                        if amt_tail:
-                            val_str = amt_tail.group(1)
-                            if "=" in last_tok:
-                                shared_suffix = f"={val_str}"
-                            elif re.search(r"(?:bk|ဘရိတ်|B)", last_tok, re.I):
-                                shared_suffix = f" {val_str}"
+            m_eq = re.fullmatch(r"(\d{1,2})\s*=\s*(\d+)", p)
+            if m_eq:
+                expanded.append(f"{m_eq.group(1)} {m_eq.group(2)}")
+                last_amt = m_eq.group(2)
+                continue
+            m_star = re.fullmatch(r"(\d{1,2})\s*\*\s*(\d+)", p)
+            if m_star:
+                expanded.append(f"{m_star.group(1)} {m_star.group(2)}")
+                last_amt = m_star.group(2)
+                continue
+            if re.fullmatch(r"\d\s*(?:bk|ဘရိတ်|B)", p, re.IGNORECASE):
+                expanded.append(p)
+                continue
+            _, p_amts = extract_numbers_and_amounts(clean_noise(p))
+            if p_amts:
+                last_amt = str(p_amts[-1])
+            expanded.append(p)
 
-                        for idx_t, tok in enumerate(slash_tokens):
-                            if idx_t < len(slash_tokens) - 1 and shared_suffix:
-                                if not re.search(
-                                    r"(?:=|[*]|(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်)\s*\d)",
-                                    tok,
-                                    re.I,
-                                ):
-                                    tok = f"{tok}{shared_suffix}"
-                            segments.append(tok)
-                    else:
-                        segments.append(sp_clean)
-
-        if len(segments) > 1:
-            return segments
+        if last_amt:
+            return [
+                f"{item} {last_amt}"
+                if re.fullmatch(r"\d\s*(?:bk|ဘရိတ်|B)", item, re.IGNORECASE)
+                else item
+                for item in expanded
+            ]
+        return expanded
 
     return [line]
 
@@ -593,25 +491,22 @@ def parse_bets_locally(text):
         if not line:
             continue
 
-        m = re.search(r"([\d,]+)\s*နေ့ရှင်း", line)
-        if m:
-            amt = int(m.group(1).replace(",", ""))
+        m_dc = re.search(r"([\d,]+)\s*နေ့ရှင်း", line)
+        if m_dc:
+            amt = int(m_dc.group(1).replace(",", ""))
             if not pending:
-                add_number(
-                    rows, "11", amt, category="main", desc=f"{amt:,} နေ့ရှင်း"
-                )
+                add_bet(rows, "11", amt, category="main", desc=f"{amt:,} နေ့ရှင်း")
                 warnings.append(
-                    f"Line {ln}: နေ့ရှင်း {amt:,} (no preceding numbers → defaulted to 11)"
+                    f"Line {ln}: နေ့ရှင်း {amt:,} (no preceding numbers → 11)"
                 )
             else:
-                per_num_amt = amt // len(pending)
+                per_amt = amt // len(pending)
                 rem = amt % len(pending)
+                nums_txt = ", ".join(x["Number"] for x in pending)
                 for idx, r in enumerate(pending):
-                    r["Amount"] = per_num_amt + (rem if idx == 0 else 0)
+                    r["Amount"] = per_amt + (rem if idx == 0 else 0)
                     r["_default"] = False
-                    r["Description"] = (
-                        f"{amt:,} နေ့ရှင်း ({', '.join([x['Number'] for x in pending])})"
-                    )
+                    r["Description"] = f"{amt:,} နေ့ရှင်း ({nums_txt})"
                 warnings.append(
                     f"Line {ln}: နေ့ရှင်း {amt:,} → {len(pending)} number(s)"
                 )
@@ -624,7 +519,7 @@ def parse_bets_locally(text):
                 if r.get("_default"):
                     pending.append(r)
             rows.extend(new_rows)
-            warnings.extend([f"Line {ln}: {w}" for w in new_warns])
+            warnings.extend(f"Line {ln}: {w}" for w in new_warns)
         except Exception as e:
             errors.append(f"Line {ln}: {e}")
 
@@ -664,7 +559,12 @@ def process_and_add_bets(extracted, date_str, day, customer):
         except (ValueError, TypeError):
             invalid += 1
             continue
-        if len(num) != 2 or not num.isdigit() or amt < 100 or amt > 500000:
+        if (
+            len(num) != 2
+            or not num.isdigit()
+            or amt < MIN_BET_AMOUNT
+            or amt > MAX_BET_AMOUNT
+        ):
             invalid += 1
             continue
         if num in blocked_numbers:
@@ -941,7 +841,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="61.2000R1000\n90.2000@.500\n19-46&2000\n3.5 B 1500\n234ခွေပူးပါ2500",
+        placeholder="64.69.23.28.49.45.21.50.30.58R1000\n3.5 B 1500\n234ခွေပူးပါ2500\n19-46&2000\n9.4.ပတ်.500",
         height=180,
     )
 
@@ -1004,7 +904,10 @@ if p:
             column_config={
                 "Number": st.column_config.TextColumn("2D", max_chars=2),
                 "Amount": st.column_config.NumberColumn(
-                    "Amount", min_value=100, max_value=500000, step=100
+                    "Amount",
+                    min_value=MIN_BET_AMOUNT,
+                    max_value=MAX_BET_AMOUNT,
+                    step=100,
                 ),
             },
             key="parse_preview",
@@ -1026,7 +929,7 @@ if p:
                         if pd.isna(amt_val):
                             continue
                         amt = int(amt_val)
-                        if amt <= 0:
+                        if amt < MIN_BET_AMOUNT:
                             continue
                         meta = (
                             orig_meta[idx]
