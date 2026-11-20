@@ -144,9 +144,9 @@ def parse_line(raw_line):
     if not line:
         return rows, warns
 
-    # 0. အစက်ခြား ထိပ် / ထိတ် နှင့် .r. ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ထိပ်.2000.r.500)
+    # 0. အစက်ခြား ထိပ် / ထိတ် နှင့် .r. / @ / & ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ထိပ်.2000.r.500)
     thate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr][\.\-\_\s]*(\d+)",
+        r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr&][\.\-\_\s]*(\d+)",
         line,
         re.I,
     )
@@ -171,9 +171,9 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 0b. အစက်ခြား ပိတ် နှင့် .r. ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ပိတ်.2000.r.500)
+    # 0b. အစက်ခြား ပိတ် နှင့် .r. / @ / & ပြောင်းပြန်တွဲလျက် (ဥပမာ - 4.ပိတ်.2000.r.500)
     pate_dot_rev = re.fullmatch(
-        r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr][\.\-\_\s]*(\d+)",
+        r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)\s*[\.\-\_\s]*\s*(\d+)\s*[\.\-\_\s]*[\@Rr&][\.\-\_\s]*(\d+)",
         line,
         re.I,
     )
@@ -198,9 +198,9 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 1. ထိပ် / ထိတ် နှင့် @/R ပြောင်းပြန်တွဲလျက်
+    # 1. ထိပ် / ထိတ် နှင့် @/R/& ပြောင်းပြန်တွဲလျက်
     thate_rev = re.fullmatch(
-        r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(\d+)\s*[\@Rr]\.?\s*(\d+)",
+        r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(\d+)\s*[\@Rr&]\.?\s*(\d+)",
         line,
         re.I,
     )
@@ -225,9 +225,9 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 2. ပိတ် နှင့် @/R ပြောင်းပြန်တွဲလျက်
+    # 2. ပိတ် နှင့် @/R/& ပြောင်းပြန်တွဲလျက်
     pate_rev = re.fullmatch(
-        r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(\d+)\s*[\@Rr]\.?\s*(\d+)", line, re.I
+        r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(\d+)\s*[\@Rr&]\.?\s*(\d+)", line, re.I
     )
     if pate_rev:
         dig = pate_rev.group(1)
@@ -299,12 +299,12 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 7. ခွေ
-    kh = re.search(r"(\d{2,5})\s*(ခွေ|အခွေ)", line)
+    # 7. ခွေ (ဥပမာ - 234ခွေပူးပါ2500 သို့မဟုတ် 234ခွေ2500)
+    kh = re.search(r"(\d{2,6})\s*(?:ခွေ|အခွေ)", line)
     if kh:
         digits = kh.group(1)
         amt = get_amount(line)
-        inc = bool(re.search(r"အပူးပါ|ပူးပါ|အပူးအပါ", line))
+        inc = bool(re.search(r"အပူးပါ|ပူးပါ|အပူးအပါ|ပူးအပါ", line))
         combos = (
             list(product(set(digits), repeat=2))
             if inc
@@ -316,16 +316,33 @@ def parse_line(raw_line):
             if n not in added:
                 added.add(n)
                 add_number(
-                    rows, n, amt, category="r_pat", desc=f"{digits} ခွေ ({amt:,})"
+                    rows,
+                    n,
+                    amt,
+                    category="r_pat",
+                    desc=f"{digits} ခွေ{' (ပူးပါ)' if inc else ''} ({amt:,})",
                 )
         return rows, warns
 
-    # 8. BK / ဘရိတ်
-    bks = re.findall(r"(\d)\s*(bk|ဘရိတ်|B)(?![a-zA-Z])", line, re.I)
+    # 8. BK / ဘရိတ် (ဥပမာ - 3.5 B 1500 သို့မဟုတ် 5bk/7bk250)
+    bks = re.findall(r"(\d)\s*(?:bk|ဘရိတ်|B)(?![a-zA-Z])", line, re.I)
+    if not bks and re.search(r"(?:bk|ဘရိတ်|(?<![a-zA-Z])B(?![a-zA-Z]))", line, re.I):
+        bk_prefix = re.split(
+            r"(?:bk|ဘရိတ်|(?<![a-zA-Z])B(?![a-zA-Z]))",
+            line,
+            maxsplit=1,
+            flags=re.I,
+        )[0]
+        bks = [(d, "B") for d in re.findall(r"\d", bk_prefix)]
+
     if bks:
         amt = get_amount(line)
-        bk_digits = [m[0] for m in bks]
-        label = " / ".join([f"{d} bk" for d in bk_digits])
+        bk_digits = []
+        for m in bks:
+            d_val = m[0] if isinstance(m, tuple) else m
+            if d_val not in bk_digits:
+                bk_digits.append(d_val)
+        label = " / ".join([f"{d} B" for d in bk_digits])
         desc_str = f"{label} (ဘရိတ်ဂဏန်း {len(bk_digits)} ခု × {amt:,})"
         for d in bk_digits:
             for n in _bk_for_digit(d):
@@ -333,7 +350,6 @@ def parse_line(raw_line):
         return rows, warns
 
     # 9. ပါတ် / ပတ် / ပက် (ဥပမာ - 9.4.ပတ်.500 နှင့် အပူးပါ/အပူးအပါ/ပူးပါ/ပူးအပါ)
-    # Note: Negative lookahead (?!ိတ်|ူး) prevents 'ပိတ်' from falsely matching 'ပ'
     pa = re.search(
         r"((?:\d[\s\.\-\/]*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ(?!ိတ်|ူး))", line
     )
@@ -365,7 +381,7 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 10. ထိပ် / ထိတ် (R/r သို့မဟုတ် @ မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
+    # 10. ထိပ် / ထိတ် (R/r/@/& မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
     th = re.search(r"(\d)\s*[\.\-\_\s]*\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)", line)
     if th:
         digit = th.group(1)
@@ -380,7 +396,7 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 11. ပိတ် (R/r သို့မဟုတ် @ မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
+    # 11. ပိတ် (R/r/@/& မပါလျှင် ပြောင်းပြန်မပါ ၁၀ ကွက်သာ)
     pt = re.search(r"(\d)\s*[\.\-\_\s]*\s*(?:နောက်ပိတ်|ပိတ်)", line)
     if pt:
         digit = pt.group(1)
@@ -395,9 +411,9 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 12. R သို့မဟုတ် @ ပါဝင်သော ပုံစံအားလုံး
-    if re.search(r"[\@Rr]", line):
-        typo = re.fullmatch(r"(\d{4})[\@Rr]\.?(\d+)", line)
+    # 12. R, @ သို့မဟုတ် & ပါဝင်သော ပြောင်းပြန် (Reverse) ပုံစံအားလုံး
+    if re.search(r"[\@Rr&]", line):
+        typo = re.fullmatch(r"(\d{4})[\@Rr&]\.?(\d+)", line)
         if typo:
             num = typo.group(1)[:2]
             base_amt = int(typo.group(1))
@@ -422,7 +438,7 @@ def parse_line(raw_line):
             )
             return rows, warns
 
-        parts = re.split(r"[\.\-\_\s]*[\@Rr][\.\-\_\s]*", line, maxsplit=1)
+        parts = re.split(r"[\.\-\_\s]*[\@Rr&][\.\-\_\s]*", line, maxsplit=1)
         if len(parts) == 2:
             left, right = parts
             rev_amt = get_amount(right)
@@ -458,7 +474,7 @@ def parse_line(raw_line):
                 warns.append(f"Could not extract numbers from '{left}'")
             return rows, warns
 
-    # 13. Universal Rule: ဂဏန်း ၂ လုံးများ + 100 နှင့်အထက် ထိုးကြေးငွေ
+    # 13. Universal Rule: ဂဏန်း ၂ လုံးများ + 100 နှင့်အထက် ထိုးကြေးငွေ (22-7500 စသည်)
     tokens = [t for t in re.split(r"[^\d]+", line) if t]
     if tokens:
         nums = []
@@ -504,21 +520,15 @@ def split_mixed_line(raw_line):
     if "နေ့ရှင်း" in line:
         return [line]
 
-    # Split mixed lines containing special patterns (bk/break/pat/khve/thate/pate/r/@)
-    # joined by '/', '*', '=', or whitespace while preserving per-segment amounts.
     if re.search(
-        r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်|[\@Rr])", line, re.I
+        r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်|[\@Rr&])", line, re.I
     ) and re.search(r"[/*=]", line):
-        # First split on '*' or explicit boundary transitions before keywords/numbers
-        # Example: 5bk/7bk250/99=1000/33/11=500*9ပတ်150tt 99*250
         raw_parts = re.split(r"\*+", line)
         segments = []
         for part in raw_parts:
             part = part.strip(" /")
             if not part:
                 continue
-            # If a part has multiple '=' or '/' chained bets like 99=1000/33/11=500 or 5bk/7bk250
-            # Split before a new standalone token/pattern that starts after a completed amount
             sub_parts = re.split(
                 r"(?<=\d)(?=(?:\d{1,2}\s*[=]|[0-9]\s*(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်)|\s+\d{1,2}\s*\*))",
                 part,
@@ -527,12 +537,19 @@ def split_mixed_line(raw_line):
             for sp in sub_parts:
                 sp_clean = sp.strip(" /*")
                 if sp_clean:
-                    # Handle chained slash groups like "33/11=500" or "5bk/7bk250"
-                    if "/" in sp_clean and ("=" in sp_clean or re.search(r"(?:bk|ဘရိတ်|B)", sp_clean, re.I)):
-                        slash_tokens = [t.strip() for t in sp_clean.split("/") if t.strip()]
-                        # Propagate trailing amount/pattern if present on the last token
+                    if "/" in sp_clean and (
+                        "=" in sp_clean
+                        or re.search(r"(?:bk|ဘရိတ်|B)", sp_clean, re.I)
+                    ):
+                        slash_tokens = [
+                            t.strip() for t in sp_clean.split("/") if t.strip()
+                        ]
                         last_tok = slash_tokens[-1]
-                        amt_tail = re.search(r"(?:=|(?<![a-zA-Z])(?:bk|ဘရိတ်|B))\s*(\d+(?:,\d+)*(?:tt)?)$", last_tok, re.I)
+                        amt_tail = re.search(
+                            r"(?:=|(?<![a-zA-Z])(?:bk|ဘရိတ်|B))\s*(\d+(?:,\d+)*(?:tt)?)$",
+                            last_tok,
+                            re.I,
+                        )
                         shared_suffix = ""
                         if amt_tail:
                             val_str = amt_tail.group(1)
@@ -543,8 +560,11 @@ def split_mixed_line(raw_line):
 
                         for idx_t, tok in enumerate(slash_tokens):
                             if idx_t < len(slash_tokens) - 1 and shared_suffix:
-                                # Only attach shared suffix if token doesn't already specify an amount/keyword
-                                if not re.search(r"(?:=|[*]|(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်)\s*\d)", tok, re.I):
+                                if not re.search(
+                                    r"(?:=|[*]|(?:bk|ဘရိတ်|B|ပတ်|ပါတ်|ပက်)\s*\d)",
+                                    tok,
+                                    re.I,
+                                ):
                                     tok = f"{tok}{shared_suffix}"
                             segments.append(tok)
                     else:
@@ -921,7 +941,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="61.2000R1000\n90.2000@.500\n40_2000@500\n4ထိတ်1000@500\n23.r500tt..\nအပူး500\n25@1000",
+        placeholder="61.2000R1000\n90.2000@.500\n19-46&2000\n3.5 B 1500\n234ခွေပူးပါ2500",
         height=180,
     )
 
