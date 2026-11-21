@@ -49,7 +49,7 @@ commission_pct = st.sidebar.number_input(
 )
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
 
-with st.sidebar.expander("🗓️ နေ့/အချိန်အလိုက် ပေါက်ဂဏန်းများ (ရွေးချယ်ရန်)"):
+with st.sidebar.expander("🗓️ နေ့/အချိန်အလိုက် ပေါက်ဂဏန်းများ (၁၀ ကြိမ်စာ)"):
     slot_win_inputs = {}
     for _d in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]:
         _c1, _c2 = st.columns(2)
@@ -216,7 +216,7 @@ def parse_line(raw_line):
     if not line:
         return rows, warns
 
-    # 1. ထိပ် / ထိတ် (with optional reverse amount after R/r/@/&: e.g. 4 ထိပ် 2000 r 500 or 4 ထိပ် 1000)
+    # 1. ထိပ် / ထိတ်
     m_thate = re.search(r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(.*)", line, re.IGNORECASE)
     if m_thate:
         dig = m_thate.group(1)
@@ -247,7 +247,7 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 2. နောက်ပိတ် / ပိတ် (with optional reverse amount after R/r/@/&: e.g. 4 ပိတ် 1000 or 4 ပိတ် 1000 @ 500)
+    # 2. နောက်ပိတ် / ပိတ်
     m_pate = re.search(r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(.*)", line, re.IGNORECASE)
     if m_pate:
         dig = m_pate.group(1)
@@ -317,7 +317,7 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 4C. အပူး / ပူး (all 10 doubles, excluding ခွေ)
+    # 4C. အပူး / ပူး
     if re.search(r"အပူ|ပူး", line) and not re.search(r"ခွေ", line):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -331,7 +331,7 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 5. နက္ခတ် (10 numbers)
+    # 5. နက္ခတ်
     if "နက္ခတ်" in line:
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -341,7 +341,7 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 6. ပါဝါ / power (10 numbers)
+    # 6. ပါဝါ / power
     if re.search(r"ပါဝါ|power", line, re.IGNORECASE):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -378,7 +378,7 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 8. BK / ဘရိတ် / B (captures ALL digits before BK/B, e.g., "3 5 B 1500" -> 3 bk & 5 bk)
+    # 8. BK / ဘရိတ် / B
     m_bk = re.search(
         r"((?:\d\s*)+)\s*(?:ဘရိတ်|bk|B)(?![a-zA-Z])(.*)", line, re.IGNORECASE
     )
@@ -402,7 +402,7 @@ def parse_line(raw_line):
                 add_bet(rows, n, amt, category="r_pat", desc=desc_str)
         return rows, warns
 
-    # 9. ပတ် / ပါတ် / ပက် / ပါ / ပ (strictly NOT ပိတ်, supports multi-digit like "9 4 ပတ် 500" and double inclusion)
+    # 9. ပတ် / ပါတ် / ပက် / ပါ / ပ
     m_pat = re.search(
         r"((?:\d\s*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ိတ်|ူး)(.*)", line
     )
@@ -439,7 +439,7 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 10. Reverse markers (R / r / @ / &): e.g. 25 r 800, 61 2000 R 1000, 19 46 & 2000, 90 2000 @ 500
+    # 10. Reverse markers (R / r / @ / &)
     if REV_MARKER_RE.search(line):
         parts = REV_MARKER_RE.split(line, maxsplit=1)
         left_nums, left_amts = extract_numbers_and_amounts(parts[0])
@@ -488,7 +488,7 @@ def parse_line(raw_line):
             add_bet(rows, n, amt, category="main", desc=desc_str)
         return rows, warns
 
-    # Standalone 2-digit numbers without amount (wait for နေ့ရှင်း or default)
+    # Standalone 2-digit numbers without amount
     if nums and not amts and re.fullmatch(r"[\d\s\-]+", line):
         num_label = ", ".join(nums)
         for n in nums:
@@ -559,7 +559,33 @@ def split_mixed_line(raw_line):
     return [line]
 
 
-def parse_bets_locally(text):
+def detect_inline_day_session(line, fallback_day, fallback_sess):
+    """Detects optional inline day/session tags if present in text."""
+    day_out = fallback_day
+    sess_out = fallback_sess
+    low = line.lower()
+
+    day_map = [
+        ("MONDAY", r"\bmon(?:day)?\b|တနင်္လာ|တနင်္လါ"),
+        ("TUESDAY", r"\btue(?:sday)?\b|အင်္ဂါ"),
+        ("WEDNESDAY", r"\bwed(?:nesday)?\b|ဗုဒ္ဓဟူး"),
+        ("THURSDAY", r"\bthu(?:rsday)?\b|ကြာသပတေး"),
+        ("FRIDAY", r"\bfri(?:day)?\b|သောကြာ"),
+    ]
+    for d_code, pat in day_map:
+        if re.search(pat, low, re.IGNORECASE):
+            day_out = d_code
+            break
+
+    if re.search(r"ညနေ|evening|\[2\]|\bpm\b", low, re.IGNORECASE):
+        sess_out = "2"
+    elif re.search(r"မနက်|morning|\[1\]|\bam\b", low, re.IGNORECASE):
+        sess_out = "1"
+
+    return day_out, sess_out
+
+
+def parse_bets_locally(text, default_day="MONDAY", default_sess="1"):
     rows, warnings, errors = [], [], []
     pending = []
 
@@ -571,10 +597,15 @@ def parse_bets_locally(text):
         if rl.strip():
             expanded_lines.extend(split_mixed_line(rl))
 
+    cur_day = default_day
+    cur_sess = default_sess
+
     for ln, raw in enumerate(expanded_lines, 1):
         line = raw.strip()
         if not line:
             continue
+
+        cur_day, cur_sess = detect_inline_day_session(line, cur_day, cur_sess)
 
         m_dc = re.search(r"([\d,]+)\s*နေ့ရှင်း", line)
         if m_dc:
@@ -601,6 +632,8 @@ def parse_bets_locally(text):
         try:
             new_rows, new_warns = parse_line(line)
             for r in new_rows:
+                r["Day"] = cur_day
+                r["Session"] = cur_sess
                 if r.get("_default"):
                     pending.append(r)
             rows.extend(new_rows)
@@ -641,6 +674,8 @@ def process_and_add_bets(extracted, date_str, day, session, customer):
             num = str(row.get("Number", "")).zfill(2)
             cat = str(row.get("Category", "main") or "main")
             desc = str(row.get("Description", num) or num)
+            r_day = str(row.get("Day") or day).upper()
+            r_sess = str(row.get("Session") or session or "1")
         except (ValueError, TypeError):
             invalid += 1
             continue
@@ -657,8 +692,8 @@ def process_and_add_bets(extracted, date_str, day, session, customer):
             continue
         valid.append({
             "Date": date_str,
-            "Day": day,
-            "Session": str(session or "1"),
+            "Day": r_day,
+            "Session": r_sess,
             "Customer": customer,
             "BatchID": batch_id,
             "Category": cat,
@@ -672,7 +707,7 @@ def process_and_add_bets(extracted, date_str, day, session, customer):
 
 
 # =========================================================
-# WEEKLY CUSTOMER STATEMENT BUILDER (MON - FRI, [1] & [2])
+# WEEKLY CUSTOMER STATEMENT BUILDER (MON - FRI, 10 SESSIONS)
 # =========================================================
 WEEKDAYS_MON_FRI = [
     ("MONDAY", "တနင်္လာ"),
@@ -681,6 +716,13 @@ WEEKDAYS_MON_FRI = [
     ("THURSDAY", "ကြာသပတေး"),
     ("FRIDAY", "သောကြာ"),
 ]
+
+
+def _normalize_session_code(val):
+    s = str(val).strip().lower()
+    if s in ("2", "[2]", "ညနေ", "ညနေပိုင်း", "evening", "pm"):
+        return "2"
+    return "1"
 
 
 def _resolve_slot_win_num(day_key, sess_key, default_win, slot_wins=None):
@@ -699,7 +741,10 @@ def build_customer_weekly_report(
         if str(default_win_in).strip().isdigit()
         else ""
     )
-    cdf = df[df["Customer"] == cust_name]
+    cdf = df[df["Customer"] == cust_name].copy()
+    if not cdf.empty:
+        cdf["_day_norm"] = cdf["Day"].astype(str).str.strip().str.upper()
+        cdf["_sess_norm"] = cdf["Session"].apply(_normalize_session_code)
 
     lines = [
         f"ဖောက်သည် အမည်- {cust_name}",
@@ -708,14 +753,22 @@ def build_customer_weekly_report(
 
     total_bets_amt = 0.0
     total_win_payout = 0.0
-    total_net_res = 0.0
+    slot_rows = []
 
     for day_en, day_mm in WEEKDAYS_MON_FRI:
         lines.append(f"\n{day_en} ({day_mm})")
-        ddf = cdf[cdf["Day"].astype(str).str.upper() == day_en]
+        ddf = (
+            cdf[cdf["_day_norm"] == day_en]
+            if not cdf.empty
+            else cdf.iloc[0:0]
+        )
 
         for sess_code, sess_mm in [("1", "မနက်ပိုင်း"), ("2", "ညနေပိုင်း")]:
-            sdf = ddf[ddf["Session"].astype(str) == sess_code]
+            sdf = (
+                ddf[ddf["_sess_norm"] == sess_code]
+                if not ddf.empty
+                else ddf.iloc[0:0]
+            )
             bet_sum = float(sdf["Amount"].sum()) if not sdf.empty else 0.0
             w_num = _resolve_slot_win_num(
                 day_en, sess_code, default_win, slot_wins
@@ -730,25 +783,35 @@ def build_customer_weekly_report(
 
             total_bets_amt += bet_sum
             total_win_payout += win_pay
-            total_net_res += res_val
+
+            slot_rows.append({
+                "Day": f"{day_en} ({day_mm})",
+                "Session": f"[{sess_code}]({sess_mm})",
+                "Bets": bet_sum,
+                "WinPayout": win_pay,
+                "Result": res_val,
+            })
 
             lines.append(f"[{sess_code}]({sess_mm}) :")
             lines.append(
-                f"({bet_sum:,.0f}) အနှုတ် ({win_pay:,.0f})=({res_val:,.0f})"
+                f"({bet_sum:,.0f}) - ({win_pay:,.0f})=({res_val:,.0f})"
             )
 
+    total_net_res = total_bets_amt - total_win_payout
+
     if total_net_res > 0:
-        outcome_lbl = f"အနိုင် (+{total_net_res:,.0f} ကျပ်)"
+        outcome_lbl = f"ဒိုင်အနိုင် / ထိုးသူပေးရန် (+{total_net_res:,.0f} ကျပ်)"
     elif total_net_res < 0:
-        outcome_lbl = f"အရှုံး ({total_net_res:,.0f} ကျပ်)"
+        outcome_lbl = f"ထိုးသူအနိုင် / ဒိုင်ပေးရန် ({total_net_res:,.0f} ကျပ်)"
     else:
         outcome_lbl = "အညီအမျှ (0 ကျပ်)"
 
     lines.extend([
         "\n" + "=" * 32,
-        f"📌 *{cust_name}* — တစ်ပတ်စာ ချုပ် (Mon - Fri)",
-        f"• စုစုပေါင်း ထိုးကြေး : {total_bets_amt:,.0f} ကျပ်",
-        f"• ပေါက်ဂဏန်း ဆုကြေး : {total_win_payout:,.0f} ကျပ်",
+        f"📌 *{cust_name}* — တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ချုပ်",
+        f"• ၁၀ ကြိမ်စာ စုစုပေါင်း ထိုးငွေ : {total_bets_amt:,.0f} ကျပ်",
+        f"• ၁၀ ကြိမ်စာ စုစုပေါင်း ပေါက်ငွေ : {total_win_payout:,.0f} ကျပ်",
+        f"• ဖော်မြူလာ : ({total_bets_amt:,.0f}) - ({total_win_payout:,.0f})=({total_net_res:,.0f})",
         f"• အရှုံး / အနိုင် ရလဒ် : *{outcome_lbl}*",
     ])
 
@@ -758,7 +821,21 @@ def build_customer_weekly_report(
         "win_payout": total_win_payout,
         "net_result": total_net_res,
         "outcome_label": outcome_lbl,
+        "slots": slot_rows,
     }
+
+
+def build_all_customers_weekly_report(
+    df, payout, default_win_in, slot_wins=None
+):
+    custs = sorted(df["Customer"].unique())
+    blocks = []
+    for c_name in custs:
+        txt, _ = build_customer_weekly_report(
+            df, c_name, payout, default_win_in, slot_wins
+        )
+        blocks.append(txt)
+    return ("\n\n" + "#" * 36 + "\n\n").join(blocks)
 
 
 # =========================================================
@@ -923,9 +1000,9 @@ def generate_styled_excel(
                 c.fill = zebra
     sheet_fmt(ws, {"A": 26, "B": 22, "C": 20, "D": 24, "E": 24, "F": 24})
 
-    # Single-sheet Weekly Customer Statement (Monday -> Friday, [1] & [2] + Weekly Summary)
+    # Single-sheet Weekly Customer Statement (Monday -> Friday, 10 Sessions + Summary)
     ws_wk = wb.create_sheet("ဖောက်သည်_တစ်ပတ်စာ")
-    ws_wk["A1"] = "ဖောက်သည် တစ်ပတ်စာ စာရင်းရှင်းတမ်း (Monday - Friday)"
+    ws_wk["A1"] = "ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri)"
     ws_wk["A1"].font = f_title
     ws_wk["A2"] = f"ထုတ်ပြန်သည့်ရက်စွဲ - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws_wk["A2"].font = f_body
@@ -937,20 +1014,26 @@ def generate_styled_excel(
             "နေ့",
             "အချိန်ပိုင်း",
             "စုစုပေါင်းထိုးငွေ",
-            "ပေါက်ဂဏန်းဆုကြေး",
-            "ရလဒ် (ထိုးငွေ - ပေါက်)",
+            "ပေါက်ဂဏန်းပမာဏ",
+            "ရလဒ် (-)",
         ],
     )
     cur_r = 4
-    for cust_name in sorted(df["Customer"].unique()):
-        cdf = df[df["Customer"] == cust_name]
+    df_wk = df.copy()
+    df_wk["_day_norm"] = df_wk["Day"].astype(str).str.strip().str.upper()
+    df_wk["_sess_norm"] = df_wk["Session"].apply(_normalize_session_code)
+
+    for cust_name in sorted(df_wk["Customer"].unique()):
+        cdf = df_wk[df_wk["Customer"] == cust_name]
         w_bets = 0.0
         w_pay = 0.0
-        w_res = 0.0
         for day_en, day_mm in WEEKDAYS_MON_FRI:
-            ddf = cdf[cdf["Day"].astype(str).str.upper() == day_en]
-            for sess_code, sess_mm in [("1", "[1](မနက်ပိုင်း)"), ("2", "[2](ညနေပိုင်း)")]:
-                sdf = ddf[ddf["Session"].astype(str) == sess_code]
+            ddf = cdf[cdf["_day_norm"] == day_en]
+            for sess_code, sess_mm in [
+                ("1", "[1](မနက်ပိုင်း)"),
+                ("2", "[2](ညနေပိုင်း)"),
+            ]:
+                sdf = ddf[ddf["_sess_norm"] == sess_code]
                 b_amt = float(sdf["Amount"].sum()) if not sdf.empty else 0.0
                 wn = _resolve_slot_win_num(day_en, sess_code, win, slot_wins)
                 wstk = (
@@ -962,7 +1045,6 @@ def generate_styled_excel(
                 r_amt = b_amt - p_amt
                 w_bets += b_amt
                 w_pay += p_amt
-                w_res += r_amt
 
                 row_vals = [
                     cust_name,
@@ -980,8 +1062,9 @@ def generate_styled_excel(
                         cell.alignment = Alignment(horizontal="right")
                 cur_r += 1
 
+        w_res = w_bets - w_pay
         sum_vals = [
-            f"{cust_name} (တစ်ပတ်စာ ချုပ်)",
+            f"{cust_name} (၁၀ ကြိမ်စာ ချုပ်)",
             "Mon - Fri",
             "အနိုင်" if w_res > 0 else ("အရှုံး" if w_res < 0 else "ညီမျှ"),
             w_bets,
@@ -999,7 +1082,7 @@ def generate_styled_excel(
 
     sheet_fmt(
         ws_wk,
-        {"A": 26, "B": 24, "C": 20, "D": 22, "E": 22, "F": 24},
+        {"A": 28, "B": 24, "C": 20, "D": 22, "E": 22, "F": 24},
     )
 
     ws = wb.create_sheet("ဂဏန်း_Limit")
@@ -1110,7 +1193,7 @@ date_str = entry_date.strftime("%Y-%m-%d")
 
 col_a, col_b = st.columns([1, 2])
 with col_a:
-    cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - သိမ့်")
+    cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မောင်မောင်")
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
@@ -1124,7 +1207,9 @@ if st.button("🔍 Parse & Preview", type="primary"):
     elif not cust.strip() or not text_in.strip():
         st.warning("ဖောက်သည်အမည်နှင့် စာသားကို ဖြည့်ပါ။")
     else:
-        res = parse_bets_locally(text_in)
+        res = parse_bets_locally(
+            text_in, default_day=selected_day, default_sess=selected_session
+        )
         st.session_state.pending_parse = {
             "customer": cust.strip(),
             "date": date_str,
@@ -1154,7 +1239,7 @@ if p:
 
     if p["rows"]:
         df_prev = pd.DataFrame(p["rows"])[
-            ["Number", "Amount", "Category", "Description"]
+            ["Number", "Amount", "Category", "Description", "Day", "Session"]
         ]
         total_bets = len(df_prev)
         total_amt = df_prev["Amount"].sum()
@@ -1174,7 +1259,7 @@ if p:
                 st.success(f"✅ **Winning Number ({win_check}) မပါဝင်ပါ။**")
 
         edited = st.data_editor(
-            df_prev[["Number", "Amount"]],
+            df_prev[["Number", "Amount", "Day", "Session"]],
             hide_index=True,
             use_container_width=True,
             num_rows="dynamic",
@@ -1186,6 +1271,8 @@ if p:
                     max_value=MAX_BET_AMOUNT,
                     step=100,
                 ),
+                "Day": st.column_config.TextColumn("Day"),
+                "Session": st.column_config.TextColumn("Session (1/2)"),
             },
             key="parse_preview",
         )
@@ -1213,11 +1300,17 @@ if p:
                             if idx < len(orig_meta)
                             else {"Category": "main", "Description": num.zfill(2)}
                         )
+                        r_day = str(row.get("Day") or p["day"]).strip().upper()
+                        r_sess = _normalize_session_code(
+                            row.get("Session") or p.get("session", "1")
+                        )
                         rows_fixed.append({
                             "Number": num.zfill(2),
                             "Amount": amt,
                             "Category": meta["Category"],
                             "Description": meta["Description"],
+                            "Day": r_day,
+                            "Session": r_sess,
                         })
                     except (ValueError, TypeError):
                         continue
@@ -1395,10 +1488,10 @@ if not st.session_state.data.empty:
                 lines.append(f"နောက်ဆုံး လက်ကျန်ရှင်းတမ်း = {bal:,.0f} ကျပ်")
             st.text_area(f"Viber ({sel})", "\n".join(lines), height=360)
 
-    # Single-sheet Weekly Statement per Customer (Mon - Fri, [1] & [2] + Weekly Summary)
+    # Single-sheet Weekly Statement per Customer (Mon - Fri, 10 Sessions + Summary)
     st.markdown("---")
     st.subheader(
-        "🗓️ ဖောက်သည် တစ်ပတ်စာ စာရင်းရှင်းတမ်း (Monday - Friday | [1]မနက် - [2]ညနေ)"
+        "🗓️ ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri | [1]မနက် - [2]ညနေ)"
     )
     cust_wk_list = sorted(df["Customer"].unique())
     sel_wk_cust = st.selectbox(
@@ -1411,15 +1504,32 @@ if not st.session_state.data.empty:
             df, sel_wk_cust, payout_rate, winning_number, slot_win_inputs
         )
         wm1, wm2, wm3 = st.columns(3)
-        wm1.metric("တစ်ပတ်စာ ထိုးကြေး", f"{wk_meta['bets_total']:,.0f} ကျပ်")
-        wm2.metric("တစ်ပတ်စာ ပေါက်ဆုကြေး", f"{wk_meta['win_payout']:,.0f} ကျပ်")
+        wm1.metric(
+            "၁၀ ကြိမ်စာ စုစုပေါင်းထိုးငွေ", f"{wk_meta['bets_total']:,.0f} ကျပ်"
+        )
+        wm2.metric(
+            "၁၀ ကြိမ်စာ စုစုပေါင်းပေါက်ငွေ",
+            f"{wk_meta['win_payout']:,.0f} ကျပ်",
+        )
         wm3.metric("အရှုံး / အနိုင် ရလဒ်", wk_meta["outcome_label"])
 
+        st.dataframe(pd.DataFrame(wk_meta["slots"]), use_container_width=True)
         st.text_area(
             f"ထိုးသူထံ ပြန်ပို့ရန် စာသား ({sel_wk_cust})",
             wk_text,
-            height=420,
+            height=440,
             key="weekly_stmt_area",
+        )
+
+    with st.expander("📋 ဖောက်သည်အားလုံး၏ တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ရှင်းတမ်းစာသားများ"):
+        all_wk_text = build_all_customers_weekly_report(
+            df, payout_rate, winning_number, slot_win_inputs
+        )
+        st.text_area(
+            "All Customers Weekly Statements",
+            all_wk_text,
+            height=460,
+            key="all_weekly_stmt_area",
         )
 
     st.markdown("---")
