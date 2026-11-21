@@ -560,26 +560,25 @@ def split_mixed_line(raw_line):
 
 
 def detect_inline_day_session(line, fallback_day, fallback_sess):
-    """Detects optional inline day/session tags if present in text."""
+    """Detects explicit standalone day/session words only when not colliding with names/codes."""
     day_out = fallback_day
     sess_out = fallback_sess
-    low = line.lower()
 
     day_map = [
-        ("MONDAY", r"\bmon(?:day)?\b|တနင်္လာ|တနင်္လါ"),
-        ("TUESDAY", r"\btue(?:sday)?\b|အင်္ဂါ"),
-        ("WEDNESDAY", r"\bwed(?:nesday)?\b|ဗုဒ္ဓဟူး"),
-        ("THURSDAY", r"\bthu(?:rsday)?\b|ကြာသပတေး"),
-        ("FRIDAY", r"\bfri(?:day)?\b|သောကြာ"),
+        ("MONDAY", r"(?:^|\b)monday(?:\b|$)|တနင်္လာ|တနင်္လါ"),
+        ("TUESDAY", r"(?:^|\b)tuesday(?:\b|$)|အင်္ဂါ"),
+        ("WEDNESDAY", r"(?:^|\b)wednesday(?:\b|$)|ဗုဒ္ဓဟူး"),
+        ("THURSDAY", r"(?:^|\b)thursday(?:\b|$)|ကြာသပတေး"),
+        ("FRIDAY", r"(?:^|\b)friday(?:\b|$)|သောကြာ"),
     ]
     for d_code, pat in day_map:
-        if re.search(pat, low, re.IGNORECASE):
+        if re.search(pat, line, re.IGNORECASE):
             day_out = d_code
             break
 
-    if re.search(r"ညနေ|evening|\[2\]|\bpm\b", low, re.IGNORECASE):
+    if re.search(r"ညနေ|ညနေပိုင်း|\[2\]", line, re.IGNORECASE):
         sess_out = "2"
-    elif re.search(r"မနက်|morning|\[1\]|\bam\b", low, re.IGNORECASE):
+    elif re.search(r"မနက်|မနက်ပိုင်း|\[1\]", line, re.IGNORECASE):
         sess_out = "1"
 
     return day_out, sess_out
@@ -674,8 +673,8 @@ def process_and_add_bets(extracted, date_str, day, session, customer):
             num = str(row.get("Number", "")).zfill(2)
             cat = str(row.get("Category", "main") or "main")
             desc = str(row.get("Description", num) or num)
-            r_day = str(row.get("Day") or day).upper()
-            r_sess = str(row.get("Session") or session or "1")
+            r_day = str(day).strip().upper()
+            r_sess = _normalize_session_code(session)
         except (ValueError, TypeError):
             invalid += 1
             continue
@@ -1177,14 +1176,13 @@ with c2:
         "WEEKEND",
     ]
     selected_day = st.selectbox(
-        "📅 နေ့", day_opts, index=min(entry_date.weekday(), 5)
+        "📅 နေ့", day_opts, index=0
     )
 with c3:
-    default_sess_idx = 0 if datetime.now().hour < 12 else 1
     selected_session = st.selectbox(
         "🕒 အချိန်ပိုင်း",
         ["1", "2"],
-        index=default_sess_idx,
+        index=0,
         format_func=lambda x: (
             "[1] မနက်ပိုင်း" if x == "1" else "[2] ညနေပိုင်း"
         ),
