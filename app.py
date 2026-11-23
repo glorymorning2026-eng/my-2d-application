@@ -119,13 +119,13 @@ MIN_BET_AMOUNT = 100
 MAX_BET_AMOUNT = 500000
 DOUBLE_NO_INCLUDE_RE = re.compile(r"ပူးမပါ|အပူးမပါ")
 DOUBLE_INCLUDE_RE = re.compile(
-    r"(?<!မ)(?:အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ|ခွေပူး|အခွေပူး|ခေွပူး|အခေွပူး|ခွေအပူး|ခေွအပူး)"
+    r"(?:အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ခွေပူး|အခွေပူး|ခေွပူး|အခေွပူး|ခွေအပူး|ခေွအပူး|အခွေအပူး|အခေွအပူး)"
 )
 KHVE_KEYWORD_RE = re.compile(r"(?:အခွေ|ခွေ|အခေွ|ခေွ)")
 REV_MARKER_RE = re.compile(r"[@Rr&]")
 
 KNOWN_KEYWORDS_RE = re.compile(
-    r"(?:ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|ပူးမပါ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|အခေွ|ခေွ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
+    r"(?:ပူးမပါ|အပူးမပါ|အခွေပူး|ခွေပူး|အခေွပူး|ခေွပူး|အခွေအပူး|ခွေအပူး|အခေွအပူး|ခေွအပူး|အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|အခေွ|ခေွ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
     re.IGNORECASE,
 )
 
@@ -359,7 +359,7 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 7. ခွေ / အခွေ / ခေွ / အခေွ (with optional ပူး / အပူးပါ; excluded if ပူးမပါ or omitted)
+    # 7. ခွေ / အခွေ / ခေွ / အခေွ (with optional ပူး / အပူးပါ / ပူးအပါ / အပူးအပါ; excluded if ပူးမပါ or omitted)
     m_khve = re.search(
         r"(\d{2,6})\s*(?:အခွေ|ခွေ|အခေွ|ခေွ)(.*)", line
     )
@@ -430,7 +430,9 @@ def parse_line(raw_line):
         if not amts:
             _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
-        inc_double = bool(DOUBLE_INCLUDE_RE.search(line))
+        inc_double = (not DOUBLE_NO_INCLUDE_RE.search(line)) and bool(
+            DOUBLE_INCLUDE_RE.search(line)
+        )
 
         pat_digits = []
         for d in re.findall(r"\d", pat_digits_raw):
@@ -1206,7 +1208,7 @@ date_str = entry_date.strftime("%Y-%m-%d")
 
 col_a, col_b = st.columns([1, 2])
 with col_a:
-    cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - မောင်မောင်")
+    cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - စည်သူ")
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
