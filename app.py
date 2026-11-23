@@ -117,11 +117,15 @@ if st.session_state.flash_warning:
 # =========================================================
 MIN_BET_AMOUNT = 100
 MAX_BET_AMOUNT = 500000
-DOUBLE_INCLUDE_RE = re.compile(r"အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ")
+DOUBLE_NO_INCLUDE_RE = re.compile(r"ပူးမပါ|အပူးမပါ")
+DOUBLE_INCLUDE_RE = re.compile(
+    r"(?<!မ)(?:အပူးပါ|အပူးအပါ|ပူးပါ|ပူးအပါ|ခွေပူး|အခွေပူး|ခေွပူး|အခေွပူး|ခွေအပူး|ခေွအပူး)"
+)
+KHVE_KEYWORD_RE = re.compile(r"(?:အခွေ|ခွေ|အခေွ|ခေွ)")
 REV_MARKER_RE = re.compile(r"[@Rr&]")
 
 KNOWN_KEYWORDS_RE = re.compile(
-    r"(?:ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
+    r"(?:ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|ပူးမပါ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|အခေွ|ခေွ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
     re.IGNORECASE,
 )
 
@@ -317,8 +321,12 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 4C. အပူး / ပူး
-    if re.search(r"အပူ|ပူး", line) and not re.search(r"ခွေ", line):
+    # 4C. အပူး / ပူး (standalone doubles, excluding ခွေ/ခေွ)
+    if (
+        re.search(r"အပူ|ပူး", line)
+        and not DOUBLE_NO_INCLUDE_RE.search(line)
+        and not KHVE_KEYWORD_RE.search(line)
+    ):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
         for i in range(10):
@@ -351,16 +359,25 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 7. ခွေ / အခွေ
-    m_khve = re.search(r"(\d{2,6})\s*(?:အခွေ|ခွေ)(.*)", line)
+    # 7. ခွေ / အခွေ / ခေွ / အခေွ (with optional ပူး / အပူးပါ; excluded if ပူးမပါ or omitted)
+    m_khve = re.search(
+        r"(\d{2,6})\s*(?:အခွေ|ခွေ|အခေွ|ခေွ)(.*)", line
+    )
     if m_khve:
         digits = m_khve.group(1)
         tail = m_khve.group(2)
         _, amts = extract_numbers_and_amounts(tail)
+        if not amts:
+            _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
-        inc_double = bool(DOUBLE_INCLUDE_RE.search(line))
+
+        explicit_no_double = bool(DOUBLE_NO_INCLUDE_RE.search(line))
+        inc_double = (not explicit_no_double) and bool(
+            DOUBLE_INCLUDE_RE.search(line)
+        )
+
         combos = (
-            product(set(digits), repeat=2)
+            product(dict.fromkeys(digits), repeat=2)
             if inc_double
             else permutations(digits, 2)
         )
@@ -374,7 +391,7 @@ def parse_line(raw_line):
                     n,
                     amt,
                     category="r_pat",
-                    desc=f"{digits} ခွေ{' (ပူးပါ)' if inc_double else ''} ({amt:,})",
+                    desc=f"{digits} ခွေ{' (ပူးပါ)' if inc_double else ' (ပူးမပါ)'} ({amt:,})",
                 )
         return rows, warns
 
@@ -516,7 +533,7 @@ def split_mixed_line(raw_line):
 
     has_kw = bool(
         re.search(
-            r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ထိပ်|ထိတ်|ပိတ်|စုံပူး|မပူး|အပူး|နက္ခတ်|ပါဝါ|power|ညီအကို|ညီကို)",
+            r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ခေွ|ထိပ်|ထိတ်|ပိတ်|စုံပူး|မပူး|အပူး|နက္ခတ်|ပါဝါ|power|ညီအကို|ညီကို)",
             line,
             re.IGNORECASE,
         )
@@ -1175,9 +1192,7 @@ with c2:
         "FRIDAY",
         "WEEKEND",
     ]
-    selected_day = st.selectbox(
-        "📅 နေ့", day_opts, index=0
-    )
+    selected_day = st.selectbox("📅 နေ့", day_opts, index=0)
 with c3:
     selected_session = st.selectbox(
         "🕒 အချိန်ပိုင်း",
@@ -1195,7 +1210,7 @@ with col_a:
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား",
-        placeholder="25r800tt\nစုံပူး1000\nမပူး1000\nနက္ခတ်500\nပါဝါ500",
+        placeholder="5016ခွေပူး500\n1ဘရိတ်750\n4ဘရိတ်.500\n10.40.90.68.31.83.56.r500\n99.94.14.19.48.89r300",
         height=180,
     )
 
