@@ -130,6 +130,40 @@ KNOWN_KEYWORDS_RE = re.compile(
 )
 
 
+def strip_viber_forward_noise(text):
+    """
+    Cleans common Viber forward metadata lines/markers such as
+    'Forwarded from ...', 'Sent', 'Read', 'Delivered', 'Today', 'Yesterday',
+    and timestamp tokens like '5:20 PM' or '17:20'.
+    """
+    cleaned_lines = []
+    for ln in text.splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if re.match(
+            r"^(?:forwarded(?:\s+from)?|sent|read|delivered|seen|today|yesterday)\b.*$",
+            s,
+            re.IGNORECASE,
+        ):
+            continue
+        # Remove standalone clock timestamps like "05:20 PM" or "17:20"
+        if re.fullmatch(r"\d{1,2}:\d{2}(?:\s*(?:AM|PM))?", s, re.IGNORECASE):
+            continue
+        s = re.sub(
+            r"\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\b", " ", s, flags=re.IGNORECASE
+        )
+        s = re.sub(
+            r"\b(?:forwarded(?:\s+from)?|sent|read|delivered|am|pm)\b",
+            " ",
+            s,
+            flags=re.IGNORECASE,
+        )
+        if s.strip():
+            cleaned_lines.append(s.strip())
+    return "\n".join(cleaned_lines)
+
+
 def add_bet(rows, number, amount, category="main", desc="", is_default=False):
     n = str(number).strip().zfill(2)
     amt = int(amount)
@@ -607,8 +641,12 @@ def parse_bets_locally(text, default_day="MONDAY", default_sess="1"):
     rows, warnings, errors = [], [], []
     pending = []
 
+    sanitized_text = strip_viber_forward_noise(text)
     raw_lines = (
-        text.replace("၊", "\n").replace(";", "\n").replace("\r", "\n").split("\n")
+        sanitized_text.replace("၊", "\n")
+        .replace(";", "\n")
+        .replace("\r", "\n")
+        .split("\n")
     )
     expanded_lines = []
     for rl in raw_lines:
@@ -1211,9 +1249,9 @@ with col_a:
     cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - စည်သူ")
 with col_b:
     text_in = st.text_area(
-        "ဖောက်သည် ပို့လိုက်သော စာသား",
+        "ဖောက်သည် ပို့လိုက်သော စာသား (Viber Forward စာများ စုပေါင်းထည့်နိုင်သည်)",
         placeholder="5016ခွေပူး500\n1ဘရိတ်750\n4ဘရိတ်.500\n10.40.90.68.31.83.56.r500\n99.94.14.19.48.89r300",
-        height=180,
+        height=200,
     )
 
 if st.button("🔍 Parse & Preview", type="primary"):
