@@ -7,6 +7,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 import pandas as pd
 import streamlit as st
+from streamlit_mic_recorder import mic_recorder
 
 # =========================================================
 # CONFIG
@@ -38,6 +39,16 @@ st.markdown(
 # SIDEBAR
 # =========================================================
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များ")
+
+# Voice Input Section
+st.sidebar.subheader("🎙️ အသံဖြင့် ထည့်သွင်းရန်")
+audio_info = mic_recorder(
+    start_prompt="အသံဖမ်းရန် နှိပ်ပါ",
+    stop_prompt="အသံ ရပ်ရန် နှိပ်ပါ",
+    just_once=False,
+    use_container_width=True,
+)
+
 max_limit = st.sidebar.number_input(
     "Limit (Max/number)", min_value=0, value=500000, step=50000
 )
@@ -131,11 +142,6 @@ KNOWN_KEYWORDS_RE = re.compile(
 
 
 def strip_viber_forward_noise(text):
-    """
-    Cleans common Viber forward metadata lines/markers such as
-    'Forwarded from ...', 'Sent', 'Read', 'Delivered', 'Today', 'Yesterday',
-    and timestamp tokens like '5:20 PM' or '17:20'.
-    """
     cleaned_lines = []
     for ln in text.splitlines():
         s = ln.strip()
@@ -147,7 +153,6 @@ def strip_viber_forward_noise(text):
             re.IGNORECASE,
         ):
             continue
-        # Remove standalone clock timestamps like "05:20 PM" or "17:20"
         if re.fullmatch(r"\d{1,2}:\d{2}(?:\s*(?:AM|PM))?", s, re.IGNORECASE):
             continue
         s = re.sub(
@@ -180,11 +185,6 @@ def add_bet(rows, number, amount, category="main", desc="", is_default=False):
 
 
 def strip_irrelevant_text(text):
-    """
-    Removes irrelevant words/names/noise (like 'tt', 'နေ့ရှင်း', customer names,
-    non-rule Myanmar/English words) while preserving digits, rule keywords,
-    and key markers (@, R, r, &, =, *).
-    """
     s = re.sub(r"\btt\b", " ", text, flags=re.IGNORECASE)
     s = re.sub(r"(?:tt|ks|mmk|ကျပ်)+", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"နေ့ရှင်း", " ", s)
@@ -197,9 +197,7 @@ def strip_irrelevant_text(text):
 
     s_prot = KNOWN_KEYWORDS_RE.sub(_keep, s)
 
-    # Remove standalone English words (e.g. names) except single-letter B/R/r
     s_prot = re.sub(r"\b(?![BRr]\b)[A-Za-z]{2,}\b", " ", s_prot)
-    # Remove non-rule Myanmar character runs
     s_prot = re.sub(r"[\u1000-\u109F]+", " ", s_prot)
 
     for idx, kw in enumerate(protected):
@@ -209,7 +207,6 @@ def strip_irrelevant_text(text):
 
 
 def clean_noise(text):
-    """Strip irrelevant words/names and normalize punctuation separators to spaces."""
     s = strip_irrelevant_text(text.strip())
     s = re.sub(r"[./,;_]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
@@ -217,12 +214,6 @@ def clean_noise(text):
 
 
 def extract_numbers_and_amounts(text):
-    """
-    Priority rule:
-    - 2-digit numbers (00-99) are treated as bet numbers.
-    - Numbers >= 100 are treated as stake amounts.
-    Returns (two_digit_nums, amounts_list).
-    """
     nums = []
     amounts = []
     for tok in re.findall(r"\d+", text):
@@ -254,7 +245,6 @@ def parse_line(raw_line):
     if not line:
         return rows, warns
 
-    # 1. ထိပ် / ထိတ်
     m_thate = re.search(r"(\d)\s*(?:ထိပ်စီး|ထိပ်|ထိတ်)\s*(.*)", line, re.IGNORECASE)
     if m_thate:
         dig = m_thate.group(1)
@@ -285,7 +275,6 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 2. နောက်ပိတ် / ပိတ်
     m_pate = re.search(r"(\d)\s*(?:နောက်ပိတ်|ပိတ်)\s*(.*)", line, re.IGNORECASE)
     if m_pate:
         dig = m_pate.group(1)
@@ -316,7 +305,6 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 3. ညီအကို / ညီကို
     if re.search(r"ညီအကို|ညီကို", line):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -335,7 +323,6 @@ def parse_line(raw_line):
                     )
         return rows, warns
 
-    # 4A. စုံပူး (00, 22, 44, 66, 88)
     if re.search(r"စုံပူး|အပူးစုံ", line):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -345,7 +332,6 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 4B. မပူး (11, 33, 55, 77, 99)
     if re.search(r"မပူး|အပူးမ", line):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -355,9 +341,8 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 4C. အပူး / ပူး (standalone doubles, excluding ခွေ/ခေွ)
     if (
-        re.search(r"အပူ|ပူး", line)
+        re.search(r"아ပူ|ပူး", line)
         and not DOUBLE_NO_INCLUDE_RE.search(line)
         and not KHVE_KEYWORD_RE.search(line)
     ):
@@ -373,7 +358,6 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 5. နက္ခတ်
     if "နက္ခတ်" in line:
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -383,7 +367,6 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 6. ပါဝါ / power
     if re.search(r"ပါဝါ|power", line, re.IGNORECASE):
         _, amts = extract_numbers_and_amounts(line)
         amt = amts[-1] if amts else 1000
@@ -393,7 +376,6 @@ def parse_line(raw_line):
             )
         return rows, warns
 
-    # 7. ခွေ / အခွေ / ခေွ / အခေွ (with optional ပူး / အပူးပါ / ပူးအပါ / အပူးအပါ; excluded if ပူးမပါ or omitted)
     m_khve = re.search(
         r"(\d{2,6})\s*(?:အခွေ|ခွေ|အခေွ|ခေွ)(.*)", line
     )
@@ -429,7 +411,6 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 8. BK / ဘရိတ် / B
     m_bk = re.search(
         r"((?:\d\s*)+)\s*(?:ဘရိတ်|bk|B)(?![a-zA-Z])(.*)", line, re.IGNORECASE
     )
@@ -453,7 +434,6 @@ def parse_line(raw_line):
                 add_bet(rows, n, amt, category="r_pat", desc=desc_str)
         return rows, warns
 
-    # 9. ပတ် / ပါတ် / ပက် / ပါ / ပ
     m_pat = re.search(
         r"((?:\d\s*)+)\s*(?:ပါတ်|ပတ်|ပက်|ပါ|ပ)(?!ိတ်|ူး)(.*)", line
     )
@@ -492,7 +472,6 @@ def parse_line(raw_line):
                 )
         return rows, warns
 
-    # 10. Reverse markers (R / r / @ / &)
     if REV_MARKER_RE.search(line):
         parts = REV_MARKER_RE.split(line, maxsplit=1)
         left_nums, left_amts = extract_numbers_and_amounts(parts[0])
@@ -531,7 +510,6 @@ def parse_line(raw_line):
         warns.append(f"Could not parse reverse line: '{raw_line.strip()}'")
         return rows, warns
 
-    # 11. Priority rule: 2-digit bet numbers + stake amount (>= 100)
     nums, amts = extract_numbers_and_amounts(line)
     if nums and amts:
         amt = amts[-1]
@@ -541,7 +519,6 @@ def parse_line(raw_line):
             add_bet(rows, n, amt, category="main", desc=desc_str)
         return rows, warns
 
-    # Standalone 2-digit numbers without amount
     if nums and not amts and re.fullmatch(r"[\d\s\-]+", line):
         num_label = ", ".join(nums)
         for n in nums:
@@ -613,7 +590,6 @@ def split_mixed_line(raw_line):
 
 
 def detect_inline_day_session(line, fallback_day, fallback_sess):
-    """Detects explicit standalone day/session words only when not colliding with names/codes."""
     day_out = fallback_day
     sess_out = fallback_sess
 
@@ -1056,7 +1032,6 @@ def generate_styled_excel(
                 c.fill = zebra
     sheet_fmt(ws, {"A": 26, "B": 22, "C": 20, "D": 24, "E": 24, "F": 24})
 
-    # Single-sheet Weekly Customer Statement (Monday -> Friday, 10 Sessions + Summary)
     ws_wk = wb.create_sheet("ဖောက်သည်_တစ်ပတ်စာ")
     ws_wk["A1"] = "ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri)"
     ws_wk["A1"].font = f_title
@@ -1122,7 +1097,7 @@ def generate_styled_excel(
         sum_vals = [
             f"{cust_name} (၁၀ ကြိမ်စာ ချုပ်)",
             "Mon - Fri",
-            "အနိုင်" if w_res > 0 else ("အရှုံး" if w_res < 0 else "ညီမျှ"),
+            "أနိုင်" if w_res > 0 else ("အရှုံး" if w_res < 0 else "ညီမျှ"),
             w_bets,
             w_pay,
             w_res,
@@ -1253,6 +1228,12 @@ with col_b:
         placeholder="5016ခွေပူး500\n1ဘရိတ်750\n4ဘရိတ်.500\n10.40.90.68.31.83.56.r500\n99.94.14.19.48.89r300",
         height=200,
     )
+
+# Handle Automated Voice Input Processing
+if audio_info and audio_info.get("text"):
+    spoken_text = audio_info.get("text")
+    st.sidebar.info(f"🎤 အသံဖမ်းရရှိသည် - {spoken_text}")
+    text_in = spoken_text
 
 if st.button("🔍 Parse & Preview", type="primary"):
     if is_closed:
@@ -1541,7 +1522,6 @@ if not st.session_state.data.empty:
                 lines.append(f"နောက်ဆုံး လက်ကျန်ရှင်းတမ်း = {bal:,.0f} ကျပ်")
             st.text_area(f"Viber ({sel})", "\n".join(lines), height=360)
 
-    # Single-sheet Weekly Statement per Customer (Mon - Fri, 10 Sessions + Summary)
     st.markdown("---")
     st.subheader(
         "🗓️ ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri | [1]မနက် - [2]ညနေ)"
