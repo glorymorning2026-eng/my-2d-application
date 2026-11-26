@@ -40,14 +40,20 @@ st.markdown(
 # =========================================================
 st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များ")
 
-# Voice Input Section
+# Voice Input Section (with debug check)
 st.sidebar.subheader("🎙️ အသံဖြင့် ထည့်သွင်းရန်")
 audio_info = mic_recorder(
     start_prompt="အသံဖမ်းရန် နှိပ်ပါ",
     stop_prompt="အသံ ရပ်ရန် နှိပ်ပါ",
     just_once=False,
     use_container_width=True,
+    key="mic_rec_1",
 )
+
+if audio_info:
+    st.write("Audio keys:", list(audio_info.keys()))
+    if audio_info.get("bytes"):
+        st.audio(audio_info["bytes"])
 
 max_limit = st.sidebar.number_input(
     "Limit (Max/number)", min_value=0, value=500000, step=50000
@@ -342,7 +348,7 @@ def parse_line(raw_line):
         return rows, warns
 
     if (
-        re.search(r"아ပူ|ပူး", line)
+        re.search(r"အပူး|ပူး", line)
         and not DOUBLE_NO_INCLUDE_RE.search(line)
         and not KHVE_KEYWORD_RE.search(line)
     ):
@@ -1097,7 +1103,7 @@ def generate_styled_excel(
         sum_vals = [
             f"{cust_name} (၁၀ ကြိမ်စာ ချုပ်)",
             "Mon - Fri",
-            "أနိုင်" if w_res > 0 else ("အရှုံး" if w_res < 0 else "ညီမျှ"),
+            "အနိုင်" if w_res > 0 else ("အရှုံး" if w_res < 0 else "ညီမျှ"),
             w_bets,
             w_pay,
             w_res,
