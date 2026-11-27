@@ -12,7 +12,7 @@ from streamlit_mic_recorder import mic_recorder
 # =========================================================
 # CONFIG
 # =========================================================
-st.set_page_config(page_title="Myanmar 2D Dealer", page_icon="📒", layout="wide")
+st.set_page_config(page_title="Myanmar 2D Dealer", page_icon="", layout="wide")
 
 st.markdown(
     """
@@ -28,8 +28,8 @@ div[data-testid="stMetricValue"] { color: #D97706; }
 st.markdown(
     """
 <div class="main-header">
-<h1>📒 မြန်မာ 2D Master Dealer App</h1>
-<p>Clean &amp; Accurate Parser • Preview &amp; Edit • Warning System • Viber Statement • Excel Export</p>
+<h1> မြန်မာ 2D Master Dealer App</h1>
+<p>Clean &amp; Accurate Parser  Preview &amp; Edit  Warning System  Viber Statement  Excel Export</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -38,10 +38,10 @@ st.markdown(
 # =========================================================
 # SIDEBAR
 # =========================================================
-st.sidebar.header("⚙️ ဒိုင် ဆက်တင်များ")
+st.sidebar.header(" ဒိုင် ဆက်တင်များ")
 
-# Voice Input Section (with debug check)
-st.sidebar.subheader("🎙️ အသံဖြင့် ထည့်သွင်းရန်")
+# Voice Input Section
+st.sidebar.subheader(" အသံဖြင့် ထည့်သွင်းရန်")
 audio_info = mic_recorder(
     start_prompt="အသံဖမ်းရန် နှိပ်ပါ",
     stop_prompt="အသံ ရပ်ရန် နှိပ်ပါ",
@@ -50,10 +50,9 @@ audio_info = mic_recorder(
     key="mic_rec_1",
 )
 
-if audio_info:
-    st.write("Audio keys:", list(audio_info.keys()))
-    if audio_info.get("bytes"):
-        st.audio(audio_info["bytes"])
+if audio_info and audio_info.get("bytes"):
+    st.sidebar.success(" အသံဖမ်းရရှိပါပြီ")
+    st.audio(audio_info["bytes"])
 
 max_limit = st.sidebar.number_input(
     "Limit (Max/number)", min_value=0, value=500000, step=50000
@@ -66,7 +65,7 @@ commission_pct = st.sidebar.number_input(
 )
 winning_number = st.sidebar.text_input("ထွက်မည့် ပေါက်ဂဏန်း", value="")
 
-with st.sidebar.expander("🗓️ နေ့/အချိန်အလိုက် ပေါက်ဂဏန်းများ (၁၀ ကြိမ်စာ)"):
+with st.sidebar.expander(" နေ့/အချိန်အလိုက် ပေါက်ဂဏန်းများ (၁၀ ကြိမ်စာ)"):
     slot_win_inputs = {}
     for _d in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]:
         _c1, _c2 = st.columns(2)
@@ -78,14 +77,14 @@ with st.sidebar.expander("🗓️ နေ့/အချိန်အလိုက်
         )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("⏰ Time Lock")
+st.sidebar.subheader(" Time Lock")
 enable_time_lock = st.sidebar.checkbox("Enable Time Lock", value=False)
 closing_time = st.sidebar.time_input(
     "Closing Time", value=datetime.strptime("12:00", "%H:%M").time()
 )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🚫 Blocked Numbers")
+st.sidebar.subheader(" Blocked Numbers")
 blocked_input = st.sidebar.text_input("Blocked (comma-separated)", value="")
 blocked_numbers = [
     n.strip().zfill(2)
@@ -136,13 +135,13 @@ MIN_BET_AMOUNT = 100
 MAX_BET_AMOUNT = 500000
 DOUBLE_NO_INCLUDE_RE = re.compile(r"ပူးမပါ|အပူးမပါ")
 DOUBLE_INCLUDE_RE = re.compile(
-    r"(?:အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ခွေပူး|အခွေပူး|ခေွပူး|အခေွပူး|ခွေအပူး|ခေွအပူး|အခွေအပူး|အခေွအပူး)"
+    r"(?:အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ခွေပူး|အခွေပူး|ခှေပူး|အခှေပူး|ခွေအပူး|ခှေအပူး|အခွေအပူး|အခှေအပူး)"
 )
-KHVE_KEYWORD_RE = re.compile(r"(?:အခွေ|ခွေ|အခေွ|ခေွ)")
+KHVE_KEYWORD_RE = re.compile(r"(?:အခွေ|ခွေ|အခှေ|ခှေ)")
 REV_MARKER_RE = re.compile(r"[@Rr&]")
 
 KNOWN_KEYWORDS_RE = re.compile(
-    r"(?:ပူးမပါ|အပူးမပါ|အခွေပူး|ခွေပူး|အခေွပူး|ခေွပူး|အခွေအပူး|ခွေအပူး|အခေွအပူး|ခေွအပူး|အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|အခေွ|ခေွ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
+    r"(?:ပူးမပါ|အပူးမပါ|အခွေပူး|ခွေပူး|အခှေပူး|ခှေပူး|အခွေအပူး|ခွေအပူး|အခှေအပူး|ခှေအပူး|အပူးအပါ|အပူးပါ|ပူးအပါ|ပူးပါ|ညီအကို|ညီကို|စုံပူး|အပူးစုံ|မပူး|အပူးမ|အပူး|ပူး|နက္ခတ်|ပါဝါ|power|အခွေ|ခွေ|အခှေ|ခှေ|ဘရိတ်|bk|ပါတ်|ပတ်|ပက်|ထိပ်စီး|ထိပ်|ထိတ်|နောက်ပိတ်|ပိတ်|နေ့ရှင်း)",
     re.IGNORECASE,
 )
 
@@ -265,7 +264,7 @@ def parse_line(raw_line):
                 f"{dig}{i}",
                 amt_front,
                 category="r_pat",
-                desc=f"{dig} ထိပ် (၁၀ ကွက် × {amt_front:,})",
+                desc=f"{dig} ထိပ် (၁၀ ကွက်  {amt_front:,})",
             )
 
         if len(rev_parts) == 2:
@@ -277,7 +276,7 @@ def parse_line(raw_line):
                     f"{i}{dig}",
                     amt_back,
                     category="r_pat",
-                    desc=f"{dig} ပိတ် ပြောင်းပြန် (၁၀ ကွက် × {amt_back:,})",
+                    desc=f"{dig} ပိတ် ပြောင်းပြန် (၁၀ ကွက်  {amt_back:,})",
                 )
         return rows, warns
 
@@ -295,7 +294,7 @@ def parse_line(raw_line):
                 f"{i}{dig}",
                 amt_back,
                 category="r_pat",
-                desc=f"{dig} ပိတ် (၁၀ ကွက် × {amt_back:,})",
+                desc=f"{dig} ပိတ် (၁၀ ကွက်  {amt_back:,})",
             )
 
         if len(rev_parts) == 2:
@@ -307,7 +306,7 @@ def parse_line(raw_line):
                     f"{dig}{i}",
                     amt_front,
                     category="r_pat",
-                    desc=f"{dig} ထိပ် ပြောင်းပြန် (၁၀ ကွက် × {amt_front:,})",
+                    desc=f"{dig} ထိပ် ပြောင်းပြန် (၁၀ ကွက်  {amt_front:,})",
                 )
         return rows, warns
 
@@ -325,7 +324,7 @@ def parse_line(raw_line):
                         item,
                         amt,
                         category="r_pat",
-                        desc=f"ညီအကို (၂၀ ကွက် × {amt:,})",
+                        desc=f"ညီအကို (၂၀ ကွက်  {amt:,})",
                     )
         return rows, warns
 
@@ -334,7 +333,7 @@ def parse_line(raw_line):
         amt = amts[-1] if amts else 1000
         for n in ["00", "22", "44", "66", "88"]:
             add_bet(
-                rows, n, amt, category="r_pat", desc=f"စုံပူး (၅ ကွက် × {amt:,})"
+                rows, n, amt, category="r_pat", desc=f"စုံပူး (၅ ကွက်  {amt:,})"
             )
         return rows, warns
 
@@ -343,7 +342,7 @@ def parse_line(raw_line):
         amt = amts[-1] if amts else 1000
         for n in ["11", "33", "55", "77", "99"]:
             add_bet(
-                rows, n, amt, category="r_pat", desc=f"မပူး (၅ ကွက် × {amt:,})"
+                rows, n, amt, category="r_pat", desc=f"မပူး (၅ ကွက်  {amt:,})"
             )
         return rows, warns
 
@@ -360,7 +359,7 @@ def parse_line(raw_line):
                 f"{i}{i}",
                 amt,
                 category="r_pat",
-                desc=f"အပူး (၁၀ ကွက် × {amt:,})",
+                desc=f"အပူး (၁၀ ကွက်  {amt:,})",
             )
         return rows, warns
 
@@ -369,7 +368,7 @@ def parse_line(raw_line):
         amt = amts[-1] if amts else 1000
         for n in ["07", "70", "18", "81", "24", "42", "35", "53", "69", "96"]:
             add_bet(
-                rows, n, amt, category="r_pat", desc=f"နက္ခတ် (၁၀ ကွက် × {amt:,})"
+                rows, n, amt, category="r_pat", desc=f"နက္ခတ် (၁၀ ကွက်  {amt:,})"
             )
         return rows, warns
 
@@ -378,13 +377,11 @@ def parse_line(raw_line):
         amt = amts[-1] if amts else 1000
         for n in ["05", "50", "16", "61", "27", "72", "38", "83", "49", "94"]:
             add_bet(
-                rows, n, amt, category="r_pat", desc=f"ပါဝါ (၁၀ ကွက် × {amt:,})"
+                rows, n, amt, category="r_pat", desc=f"ပါဝါ (၁၀ ကွက်  {amt:,})"
             )
         return rows, warns
 
-    m_khve = re.search(
-        r"(\d{2,6})\s*(?:အခွေ|ခွေ|အခေွ|ခေွ)(.*)", line
-    )
+    m_khve = re.search(r"(\d{2,6})\s*(?:အခွေ|ခွေ|အခှေ|ခှေ)(.*)", line)
     if m_khve:
         digits = m_khve.group(1)
         tail = m_khve.group(2)
@@ -434,7 +431,7 @@ def parse_line(raw_line):
                 bk_digits.append(d)
 
         label = " / ".join(f"{d} bk" for d in bk_digits)
-        desc_str = f"{label} (ဘရိတ်ဂဏန်း {len(bk_digits)} ခု × {amt:,})"
+        desc_str = f"{label} (ဘရိတ်ဂဏန်း {len(bk_digits)} ခု  {amt:,})"
         for d in bk_digits:
             for n in _bk_numbers(d):
                 add_bet(rows, n, amt, category="r_pat", desc=desc_str)
@@ -463,7 +460,7 @@ def parse_line(raw_line):
             desc_str = (
                 f"{d} ပတ် အပူးပါ ({amt:,})"
                 if inc_double
-                else f"{d} ပတ် (၁၉ ကွက် × {amt:,})"
+                else f"{d} ပတ် (၁၉ ကွက်  {amt:,})"
             )
             for n in _pat_numbers(d):
                 add_bet(rows, n, amt, category="r_pat", desc=desc_str)
@@ -488,7 +485,7 @@ def parse_line(raw_line):
             if len(first_str) >= 2:
                 left_nums = [first_str[:2]]
                 left_amts = [int(first_str)]
-                warns.append(f"Assumed '{line}' → {left_nums[0]}={left_amts[0]}")
+                warns.append(f"Assumed '{line}'  {left_nums[0]}={left_amts[0]}")
 
         rev_amt = (
             right_amts[-1]
@@ -501,7 +498,7 @@ def parse_line(raw_line):
             num_label = " / ".join(left_nums)
             total_k = sum(2 if n != n[::-1] else 1 for n in left_nums)
             desc_str = (
-                f"{num_label} R ({total_k} ကွက် × {rev_amt:,})"
+                f"{num_label} R ({total_k} ကွက်  {rev_amt:,})"
                 if base_amt == rev_amt
                 else f"{num_label} R ({base_amt:,} / {rev_amt:,})"
             )
@@ -552,7 +549,7 @@ def split_mixed_line(raw_line):
 
     has_kw = bool(
         re.search(
-            r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ခေွ|ထိပ်|ထိတ်|ပိတ်|စုံပူး|မပူး|အပူး|နက္ခတ်|ပါဝါ|power|ညီအကို|ညီကို)",
+            r"(?:bk|ဘရိတ်|ပတ်|ပါတ်|ပက်|ခွေ|ခှေ|ထိပ်|ထိတ်|ပိတ်|စုံပူး|မပူး|အပူး|နက္ခတ်|ပါဝါ|power|ညီအကို|ညီကို)",
             line,
             re.IGNORECASE,
         )
@@ -651,7 +648,7 @@ def parse_bets_locally(text, default_day="MONDAY", default_sess="1"):
             if not pending:
                 add_bet(rows, "11", amt, category="main", desc=f"{amt:,} နေ့ရှင်း")
                 warnings.append(
-                    f"Line {ln}: နေ့ရှင်း {amt:,} (no preceding numbers → 11)"
+                    f"Line {ln}: နေ့ရှင်း {amt:,} (no preceding numbers  11)"
                 )
             else:
                 per_amt = amt // len(pending)
@@ -662,7 +659,7 @@ def parse_bets_locally(text, default_day="MONDAY", default_sess="1"):
                     r["_default"] = False
                     r["Description"] = f"{amt:,} နေ့ရှင်း ({nums_txt})"
                 warnings.append(
-                    f"Line {ln}: နေ့ရှင်း {amt:,} → {len(pending)} number(s)"
+                    f"Line {ln}: နေ့ရှင်း {amt:,}  {len(pending)} number(s)"
                 )
                 pending.clear()
             continue
@@ -846,11 +843,11 @@ def build_customer_weekly_report(
 
     lines.extend([
         "\n" + "=" * 32,
-        f"📌 *{cust_name}* — တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ချုပ်",
-        f"• ၁၀ ကြိမ်စာ စုစုပေါင်း ထိုးငွေ : {total_bets_amt:,.0f} ကျပ်",
-        f"• ၁၀ ကြိမ်စာ စုစုပေါင်း ပေါက်ငွေ : {total_win_payout:,.0f} ကျပ်",
-        f"• ဖော်မြူလာ : ({total_bets_amt:,.0f}) - ({total_win_payout:,.0f})=({total_net_res:,.0f})",
-        f"• အရှုံး / အနိုင် ရလဒ် : *{outcome_lbl}*",
+        f" *{cust_name}*  တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ချုပ်",
+        f" ၁၀ ကြိမ်စာ စုစုပေါင်း ထိုးငွေ : {total_bets_amt:,.0f} ကျပ်",
+        f" ၁၀ ကြိမ်စာ စုစုပေါင်း ပေါက်ငွေ : {total_win_payout:,.0f} ကျပ်",
+        f" ဖော်မြူလာ : ({total_bets_amt:,.0f}) - ({total_win_payout:,.0f})=({total_net_res:,.0f})",
+        f" အရှုံး / အနိုင် ရလဒ် : *{outcome_lbl}*",
     ])
 
     return "\n".join(lines), {
@@ -1192,18 +1189,18 @@ def generate_styled_excel(
 # =========================================================
 # ENTRY SECTION
 # =========================================================
-st.subheader("📝 စာရင်းသွင်းရန်")
+st.subheader(" စာရင်းသွင်းရန်")
 
 is_closed = False
 if enable_time_lock and datetime.now().time() >= closing_time:
     is_closed = True
     st.error(
-        f"⚠️ စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်ပါပြီ။"
+        f" စာရင်းပိတ်ချိန် ({closing_time.strftime('%H:%M')}) ကျော်လွန်ပါပြီ။"
     )
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    entry_date = st.date_input("📆 ရက်စွဲ", value=datetime.now().date())
+    entry_date = st.date_input(" ရက်စွဲ", value=datetime.now().date())
 with c2:
     day_opts = [
         "MONDAY",
@@ -1213,10 +1210,10 @@ with c2:
         "FRIDAY",
         "WEEKEND",
     ]
-    selected_day = st.selectbox("📅 နေ့", day_opts, index=0)
+    selected_day = st.selectbox(" နေ့", day_opts, index=0)
 with c3:
     selected_session = st.selectbox(
-        "🕒 အချိန်ပိုင်း",
+        " အချိန်ပိုင်း",
         ["1", "2"],
         index=0,
         format_func=lambda x: (
@@ -1225,23 +1222,21 @@ with c3:
     )
 date_str = entry_date.strftime("%Y-%m-%d")
 
+q_bet = st.query_params.get("bet", "")
+default_bet_text = q_bet if isinstance(q_bet, str) else ""
+
 col_a, col_b = st.columns([1, 2])
 with col_a:
     cust = st.text_input("ဖောက်သည် အမည်", placeholder="ဥပမာ - စည်သူ")
 with col_b:
     text_in = st.text_area(
         "ဖောက်သည် ပို့လိုက်သော စာသား (Viber Forward စာများ စုပေါင်းထည့်နိုင်သည်)",
+        value=default_bet_text,
         placeholder="5016ခွေပူး500\n1ဘရိတ်750\n4ဘရိတ်.500\n10.40.90.68.31.83.56.r500\n99.94.14.19.48.89r300",
         height=200,
     )
 
-# Handle Automated Voice Input Processing
-if audio_info and audio_info.get("text"):
-    spoken_text = audio_info.get("text")
-    st.sidebar.info(f"🎤 အသံဖမ်းရရှိသည် - {spoken_text}")
-    text_in = spoken_text
-
-if st.button("🔍 Parse & Preview", type="primary"):
+if st.button(" Parse & Preview", type="primary"):
     if is_closed:
         st.error("စာရင်းပိတ်ချိန် ကျော်လွန်နေပါသည်။")
     elif not cust.strip() or not text_in.strip():
@@ -1269,7 +1264,7 @@ if p:
     st.markdown("---")
     sess_lbl = "[1] မနက်ပိုင်း" if p.get("session", "1") == "1" else "[2] ညနေပိုင်း"
     st.subheader(
-        f"👁️ Preview — {p['customer']} ({p['date']} / {p['day']} / {sess_lbl})"
+        f" Preview  {p['customer']} ({p['date']} / {p['day']} / {sess_lbl})"
     )
 
     for e in p["errors"]:
@@ -1293,10 +1288,10 @@ if p:
             win_matches = df_prev[df_prev["Number"] == win_check]
             if not win_matches.empty:
                 st.warning(
-                    f"🏆 **Winning Number ({win_check}) ပါဝင်နေပါသည်။** ထိုးငွေ: {win_matches['Amount'].sum():,.0f} ကျပ်"
+                    f" **Winning Number ({win_check}) ပါဝင်နေပါသည်။** ထိုးငွေ: {win_matches['Amount'].sum():,.0f} ကျပ်"
                 )
             else:
-                st.success(f"✅ **Winning Number ({win_check}) မပါဝင်ပါ။**")
+                st.success(f" **Winning Number ({win_check}) မပါဝင်ပါ။**")
 
         edited = st.data_editor(
             df_prev[["Number", "Amount", "Day", "Session"]],
@@ -1319,7 +1314,7 @@ if p:
 
         cs, cc = st.columns(2)
         with cs:
-            if st.button("✅ Save to Ledger", type="primary", use_container_width=True):
+            if st.button(" Save to Ledger", type="primary", use_container_width=True):
                 rows_fixed = []
                 orig_meta = df_prev[["Category", "Description"]].to_dict(
                     "records"
@@ -1365,7 +1360,7 @@ if p:
                     st.session_state.data = pd.concat(
                         [st.session_state.data, pd.DataFrame(v)], ignore_index=True
                     )
-                    msg = f"🎉 {len(v)} ကွက် / {tot:,} ကျပ် သိမ်းဆည်းပြီး"
+                    msg = f" {len(v)} ကွက် / {tot:,} ကျပ် သိမ်းဆည်းပြီး"
                     if blk:
                         msg += f" | ပိတ်ဂဏန်း ဖယ်: {', '.join(sorted(set(blk)))}"
                     if inv:
@@ -1377,12 +1372,12 @@ if p:
                     st.session_state.flash_warning = "သိမ်းဆည်းနိုင်သော ကွက် မရှိပါ။"
                     st.rerun()
         with cc:
-            if st.button("❌ Cancel", use_container_width=True):
+            if st.button(" Cancel", use_container_width=True):
                 st.session_state.pending_parse = None
                 st.rerun()
     else:
         st.error("Parse မှ ရလဒ် မထွက်ပါ။ စာသားပုံစံကို စစ်ဆေးပါ။")
-        if st.button("❌ Cancel"):
+        if st.button(" Cancel"):
             st.session_state.pending_parse = None
             st.rerun()
 
@@ -1404,7 +1399,7 @@ if not st.session_state.data.empty:
     payout = win_tot * payout_rate
     pl = net - payout
 
-    st.subheader("📊 အဓိက စာရင်းချုပ်")
+    st.subheader(" အဓိက စာရင်းချုပ်")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("ရောင်းရငွေ", f"{tot:,.0f}")
     m2.metric(f"ကော်မရှင် {commission_pct}%", f"{comm:,.0f}")
@@ -1412,7 +1407,7 @@ if not st.session_state.data.empty:
     m4.metric("အသားတင် P/L", f"{pl:,.0f}")
 
     st.markdown("---")
-    st.subheader("🏆 ပေါက်ဂဏန်း တိုက်စစ်")
+    st.subheader(" ပေါက်ဂဏန်း တိုက်စစ်")
     if win:
         if not matched.empty:
             st.success(f"ပေါက်ဂဏန်း ({win}) ကံထူးရှင်များ:")
@@ -1428,7 +1423,7 @@ if not st.session_state.data.empty:
         st.info("Sidebar တွင် ပေါက်ဂဏန်း ထည့်ပါ။")
 
     st.markdown("---")
-    with st.expander("✏️ Edit / Delete Bet Records"):
+    with st.expander(" Edit / Delete Bet Records"):
         edited_ledger = st.data_editor(
             st.session_state.data,
             num_rows="dynamic",
@@ -1437,7 +1432,7 @@ if not st.session_state.data.empty:
         )
         ce1, ce2 = st.columns(2)
         with ce1:
-            if st.button("💾 Apply Changes to Ledger"):
+            if st.button(" Apply Changes to Ledger"):
                 st.session_state.data = edited_ledger.reset_index(drop=True)
                 st.session_state.flash_success = "ပြင်ဆင်မှု သိမ်းပြီး"
                 st.rerun()
@@ -1445,11 +1440,11 @@ if not st.session_state.data.empty:
             st.caption(f"စုစုပေါင်း Record: {len(st.session_state.data)}")
 
     st.markdown("---")
-    st.subheader("📨 Viber Statements")
+    st.subheader(" Viber Statements")
     col_rep1, col_rep2 = st.columns(2)
 
     with col_rep1:
-        st.markdown("##### 📒 ဒိုင်ချုပ်")
+        st.markdown("#####  ဒိုင်ချုပ်")
         dsum = df.groupby(["Date", "Day"])["Amount"].sum().reset_index()
         st.dataframe(dsum, use_container_width=True)
         lines = ["*မြန်မာ 2D စာရင်းချုပ်အစီရင်ခံစာ*", "=" * 28]
@@ -1468,13 +1463,13 @@ if not st.session_state.data.empty:
         st.text_area("Dealer Viber Text", "\n".join(lines), height=220)
 
     with col_rep2:
-        st.markdown("##### 👤 ဖောက်သည် ရှင်းတမ်း (အပိုင်းအလိုက် အသေးစိတ်)")
+        st.markdown("#####  ဖောက်သည် ရှင်းတမ်း (အပိုင်းအလိုက် အသေးစိတ်)")
         custs = sorted(df["Customer"].unique())
         sel = st.selectbox("ဖောက်သည်", custs)
         if sel:
             cdf = df[df["Customer"] == sel]
             lines = [
-                f"📊 *{sel}* ၏ စုစုပေါင်း ထိုးငွေအသေးစိတ်ရှင်းတမ်း",
+                f" *{sel}* ၏ စုစုပေါင်း ထိုးငွေအသေးစိတ်ရှင်းတမ်း",
                 "=" * 32,
             ]
             batch_totals = []
@@ -1487,21 +1482,21 @@ if not st.session_state.data.empty:
 
                 main_df = bdf[bdf["Category"] == "main"]
                 if not main_df.empty:
-                    lines.append("🔹 *နေ့ရှင်းနှင့် အဓိကထိုးငွေများ:*")
+                    lines.append(" *နေ့ရှင်းနှင့် အဓိကထိုးငွေများ:*")
                     for desc_lbl, grp_d in main_df.groupby(
                         "Description", sort=False
                     ):
                         sub_amt = grp_d["Amount"].sum()
-                        lines.append(f"  • {desc_lbl} = {sub_amt:,.0f} ကျပ်")
+                        lines.append(f"   {desc_lbl} = {sub_amt:,.0f} ကျပ်")
 
                 rpat_df = bdf[bdf["Category"] == "r_pat"]
                 if not rpat_df.empty:
-                    lines.append("\n🔹 *ပတ်လည်နှင့် ရိုဂဏန်းများ (R & Pat):*")
+                    lines.append("\n *ပတ်လည်နှင့် ရိုဂဏန်းများ (R & Pat):*")
                     for desc_lbl, grp_d in rpat_df.groupby(
                         "Description", sort=False
                     ):
                         sub_amt = grp_d["Amount"].sum()
-                        lines.append(f"  • {desc_lbl} = {sub_amt:,.0f} ကျပ်")
+                        lines.append(f"   {desc_lbl} = {sub_amt:,.0f} ကျပ်")
 
                 lines.append(f"\n*{b} စုစုပေါင်း* = {bt:,.0f} ကျပ်\n")
 
@@ -1530,7 +1525,7 @@ if not st.session_state.data.empty:
 
     st.markdown("---")
     st.subheader(
-        "🗓️ ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri | [1]မနက် - [2]ညနေ)"
+        " ဖောက်သည် တစ်ပတ်စာ (၁၀ ကြိမ်စာ) စာရင်းရှင်းတမ်း (Mon - Fri | [1]မနက် - [2]ညနေ)"
     )
     cust_wk_list = sorted(df["Customer"].unique())
     sel_wk_cust = st.selectbox(
@@ -1560,7 +1555,7 @@ if not st.session_state.data.empty:
             key="weekly_stmt_area",
         )
 
-    with st.expander("📋 ဖောက်သည်အားလုံး၏ တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ရှင်းတမ်းစာသားများ"):
+    with st.expander(" ဖောက်သည်အားလုံး၏ တစ်ပတ်စာ (၁၀ ကြိမ်စာ) ရှင်းတမ်းစာသားများ"):
         all_wk_text = build_all_customers_weekly_report(
             df, payout_rate, winning_number, slot_win_inputs
         )
@@ -1575,7 +1570,7 @@ if not st.session_state.data.empty:
     cl, cr = st.columns(2)
 
     with cl:
-        st.subheader("🔢 ဂဏန်း Limit")
+        st.subheader(" ဂဏန်း Limit")
         grp = (
             df.groupby("Number")["Amount"]
             .sum()
@@ -1587,7 +1582,7 @@ if not st.session_state.data.empty:
         st.dataframe(grp, use_container_width=True)
 
     with cr:
-        st.subheader("👥 Batch အလိုက်")
+        st.subheader(" Batch အလိုက်")
         cons = (
             df.groupby(["Date", "Day", "Session", "Customer", "BatchID", "Number"])[
                 "Amount"
@@ -1598,7 +1593,7 @@ if not st.session_state.data.empty:
         st.dataframe(cons, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("📥 Export & Management")
+    st.subheader(" Export & Management")
     ce, cx = st.columns([2, 1])
 
     with ce:
@@ -1611,7 +1606,7 @@ if not st.session_state.data.empty:
             slot_win_inputs,
         )
         st.download_button(
-            "📥 Excel Download",
+            " Excel Download",
             data=xls,
             file_name=f"2D_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1620,19 +1615,19 @@ if not st.session_state.data.empty:
 
     with cx:
         if not st.session_state.confirm_clear:
-            if st.button("🗑️ Clear All"):
+            if st.button(" Clear All"):
                 st.session_state.confirm_clear = True
                 st.rerun()
         else:
             st.warning("သေချာပါသလား? ပြန်မရနိုင်ပါ။")
             c1x, c2x = st.columns(2)
             with c1x:
-                if st.button("✅ Yes"):
+                if st.button(" Yes"):
                     st.session_state.data = pd.DataFrame(columns=COLUMNS)
                     st.session_state.confirm_clear = False
                     st.rerun()
             with c2x:
-                if st.button("❌ No"):
+                if st.button(" No"):
                     st.session_state.confirm_clear = False
                     st.rerun()
 
